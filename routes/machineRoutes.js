@@ -16,15 +16,15 @@ router.use(protect);
 router
   .route("/")
   .get(getMachines)
-  .post(authorize("owner"), createMachine);
+  .post(authorize("admin", "owner"), createMachine);
 
 router
   .route("/:id")
   .get(getMachineById)
-  .put(authorize("owner"), updateMachine)
-  .delete(authorize("owner"), deleteMachine);
+  .put(authorize("admin", "owner"), updateMachine)
+  .delete(authorize("admin", "owner"), deleteMachine);
 
 router.patch("/:id/status", updateMachineStatus); // owner or assigned employee
-router.post("/:id/assign", authorize("owner"), assignMachine);
+router.post("/:id/assign", authorize("admin", "owner"), assignMachine);
 
 module.exports = router;

@@ -3,6 +3,11 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const User = require("../models/User");
 
+const creatableRoles = {
+  admin: ["admin", "owner", "general_manager", "employee"],
+  owner: ["general_manager", "employee"],
+};
+
 const generateToken = (id) =>
   jwt.sign({ id }, process.env.JWT_SECRET, {
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
@@ -14,6 +19,12 @@ const generateToken = (id) =>
 // @access  Owner
 const register = asyncHandler(async (req, res) => {
   const { name, email, phoneNumber, password, role, employee } = req.body;
+  const targetRole = role || "employee";
+
+  if (!creatableRoles[req.user.role]?.includes(targetRole)) {
+    res.status(403);
+    throw new Error("You are not permitted to create this account type");
+  }
 
   const existing = await User.findOne({ email });
   if (existing) {
@@ -26,7 +37,7 @@ const register = asyncHandler(async (req, res) => {
     email,
     phoneNumber,
     password,
-    role: role || "employee",
+    role: targetRole,
     employee,
   });
 

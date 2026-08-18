@@ -22,6 +22,13 @@ const maintenanceSchema = new mongoose.Schema(
     videos: [{ type: String }],
     reportPdf: { type: String },
     performedBy: { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
+    approvalStatus: {
+      type: String,
+      enum: ["Submitted", "Approved", "Rejected"],
+      default: "Submitted",
+    },
+    approvedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    approvedAt: { type: Date },
   },
   { timestamps: true }
 );

@@ -2,6 +2,13 @@ const jwt = require("jsonwebtoken");
 const asyncHandler = require("express-async-handler");
 const User = require("../models/User");
 
+const ROLES = Object.freeze({
+  ADMIN: "admin",
+  OWNER: "owner",
+  GENERAL_MANAGER: "general_manager",
+  EMPLOYEE: "employee",
+});
+
 // Verifies the JWT and attaches req.user
 const protect = asyncHandler(async (req, res, next) => {
   let token;
@@ -52,4 +59,4 @@ const requireSchedulerKey = (req, res, next) => {
   next();
 };
 
-module.exports = { protect, authorize, requireSchedulerKey };
+module.exports = { protect, authorize, requireSchedulerKey, ROLES };

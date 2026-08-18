@@ -19,6 +19,6 @@ router
   .route("/:id")
   .get(getMaintenanceById)
   .put(updateMaintenance)
-  .delete(authorize("owner"), deleteMaintenance);
+  .delete(authorize("admin"), deleteMaintenance);
 
 module.exports = router;

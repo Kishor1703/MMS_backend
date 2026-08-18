@@ -15,6 +15,8 @@ const employeeSchema = new mongoose.Schema(
     ],
     isActive: { type: Boolean, default: true },
     user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    // Owner or general manager responsible for this employee.
+    manager: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },
   { timestamps: true }
 );

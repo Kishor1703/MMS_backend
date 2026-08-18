@@ -2,6 +2,19 @@ const asyncHandler = require("express-async-handler");
 const OilChange = require("../models/OilChange");
 const Machine = require("../models/Machine");
 const ActivityLog = require("../models/ActivityLog");
+const Employee = require("../models/Employee");
+
+const getEmployee = (userId) => Employee.findOne({ user: userId, isActive: true });
+
+const assertAssigned = async (req, res, machineId) => {
+  if (req.user.role !== "employee") return null;
+  const employee = await getEmployee(req.user._id);
+  if (!employee?.assignedMachines.some((id) => String(id) === String(machineId))) {
+    res.status(403);
+    throw new Error("You can only create records for assigned machines");
+  }
+  return employee;
+};
 
 // @desc    Log a new oil change. nextOilChangeDate = oilChangeDate + 6 months
 //          is computed automatically by the OilChange model's pre-validate hook.
@@ -23,13 +36,14 @@ const createOilChange = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Machine not found");
   }
+  const currentEmployee = await assertAssigned(req, res, machine);
 
   const oilChange = await OilChange.create({
     machine,
     oilChangeDate,
     oilType,
     oilQuantity,
-    changedBy,
+    changedBy: currentEmployee?._id || changedBy,
     remarks,
     reminderMonthsInterval,
   });
@@ -52,6 +66,10 @@ const getOilChanges = asyncHandler(async (req, res) => {
   const { machine, page = 1, limit = 20 } = req.query;
   const query = {};
   if (machine) query.machine = machine;
+  if (req.user.role === "employee") {
+    const employee = await getEmployee(req.user._id);
+    query.changedBy = employee?._id || null;
+  }
 
   const skip = (Number(page) - 1) * Number(limit);
 
@@ -83,6 +101,13 @@ const getOilChangeById = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Oil change record not found");
   }
+  if (req.user.role === "employee") {
+    const employee = await getEmployee(req.user._id);
+    if (String(record.changedBy) !== String(employee?._id)) {
+      res.status(403);
+      throw new Error("You can only access your own oil-change records");
+    }
+  }
   res.json({ success: true, data: record });
 });
 
@@ -97,8 +122,17 @@ const updateOilChange = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Oil change record not found");
   }
+  if (req.user.role === "employee") {
+    const employee = await getEmployee(req.user._id);
+    if (String(record.changedBy) !== String(employee?._id)) {
+      res.status(403);
+      throw new Error("You can only update your own oil-change records");
+    }
+  }
 
-  Object.assign(record, req.body);
+  const updates = { ...req.body };
+  if (req.user.role === "employee") delete updates.changedBy;
+  Object.assign(record, updates);
   await record.save(); // triggers pre-validate hook to recompute nextOilChangeDate
 
   res.json({ success: true, data: record });

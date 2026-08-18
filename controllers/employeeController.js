@@ -2,6 +2,9 @@ const asyncHandler = require("express-async-handler");
 const Employee = require("../models/Employee");
 const User = require("../models/User");
 
+const employeeScope = (req) =>
+  req.user.role === "general_manager" ? { manager: req.user._id } : {};
+
 // @desc    Create an employee (optionally also creates their login User)
 // @route   POST /api/employees
 // @access  Owner
@@ -13,7 +16,7 @@ const createEmployee = asyncHandler(async (req, res) => {
     email,
     department,
     designation,
-    profilePhoto,
+    profilePhoto, manager,
     password,
   } = req.body;
 
@@ -28,6 +31,7 @@ const createEmployee = asyncHandler(async (req, res) => {
     throw new Error("An employee with this ID or email already exists");
   }
 
+  // General managers may only create employees reporting to themselves.
   const employee = await Employee.create({
     employeeId,
     name,
@@ -36,6 +40,7 @@ const createEmployee = asyncHandler(async (req, res) => {
     department,
     designation,
     profilePhoto,
+    manager: req.user.role === "general_manager" ? req.user._id : manager,
   });
 
   // Create the linked login account if a password was supplied
@@ -60,7 +65,7 @@ const createEmployee = asyncHandler(async (req, res) => {
 // @access  Owner
 const getEmployees = asyncHandler(async (req, res) => {
   const { search, department, page = 1, limit = 20 } = req.query;
-  const query = { isActive: true };
+  const query = { isActive: true, ...employeeScope(req) };
 
   if (department) query.department = department;
   if (search) {
@@ -90,7 +95,7 @@ const getEmployees = asyncHandler(async (req, res) => {
 // @desc    Get single employee
 // @route   GET /api/employees/:id
 const getEmployeeById = asyncHandler(async (req, res) => {
-  const employee = await Employee.findById(req.params.id).populate(
+  const employee = await Employee.findOne({ _id: req.params.id, ...employeeScope(req) }).populate(
     "assignedMachines",
     "machineName machineNumber status"
   );
@@ -105,12 +110,15 @@ const getEmployeeById = asyncHandler(async (req, res) => {
 // @route   PUT /api/employees/:id
 // @access  Owner
 const updateEmployee = asyncHandler(async (req, res) => {
-  const employee = await Employee.findById(req.params.id);
+  const employee = await Employee.findOne({ _id: req.params.id, ...employeeScope(req) });
   if (!employee) {
     res.status(404);
     throw new Error("Employee not found");
   }
-  Object.assign(employee, req.body);
+  // A general manager cannot reassign employees outside their team.
+  const updates = { ...req.body };
+  if (req.user.role === "general_manager") delete updates.manager;
+  Object.assign(employee, updates);
   await employee.save();
   res.json({ success: true, data: employee });
 });
@@ -119,7 +127,7 @@ const updateEmployee = asyncHandler(async (req, res) => {
 // @route   DELETE /api/employees/:id
 // @access  Owner
 const deleteEmployee = asyncHandler(async (req, res) => {
-  const employee = await Employee.findById(req.params.id);
+  const employee = await Employee.findOne({ _id: req.params.id, ...employeeScope(req) });
   if (!employee) {
     res.status(404);
     throw new Error("Employee not found");

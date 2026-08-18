@@ -33,6 +33,7 @@ app.use("/api/machines", require("./routes/machineRoutes"));
 app.use("/api/maintenance", require("./routes/maintenanceRoutes"));
 app.use("/api/oil-changes", require("./routes/oilChangeRoutes"));
 app.use("/api/spare-parts", require("./routes/sparePartRoutes"));
+app.use("/api/maintenance-jobs", require("./routes/maintenanceJobRoutes"));
 app.use("/api/notifications", require("./routes/notificationRoutes"));
 app.use("/api/dashboard", require("./routes/dashboardRoutes"));
 app.use("/api/reports", require("./routes/reportRoutes"));

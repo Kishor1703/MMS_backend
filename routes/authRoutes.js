@@ -10,7 +10,7 @@ const {
   resetPassword,
 } = require("../controllers/authController");
 
-router.post("/register", protect, authorize("owner"), register);
+router.post("/register", protect, authorize("admin", "owner"), register);
 router.post("/login", login);
 router.get("/me", protect, getMe);
 router.put("/change-password", protect, changePassword);

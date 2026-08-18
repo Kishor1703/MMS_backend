@@ -3,8 +3,7 @@ const bcrypt = require("bcryptjs");
 
 /**
  * Users collection is the authentication identity for the system.
- * role = "owner" -> full admin access
- * role = "employee" -> linked to an Employee profile document via `employee` ref
+ * Roles are ordered: admin -> owner -> general_manager -> employee.
  */
 const userSchema = new mongoose.Schema(
   {
@@ -20,7 +19,7 @@ const userSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 6, select: false },
     role: {
       type: String,
-      enum: ["owner", "employee"],
+      enum: ["admin", "owner", "general_manager", "employee"],
       required: true,
       default: "employee",
     },

@@ -6,6 +6,16 @@ const SparePart = require("../models/SparePart");
 const Employee = require("../models/Employee");
 const ActivityLog = require("../models/ActivityLog");
 
+const isAssignedEmployee = async (user, machineId) => {
+  if (user.role !== "employee") return false;
+  const employee = await Employee.findOne({ user: user._id, isActive: true });
+  return Boolean(employee?.assignedMachines.some((id) => String(id) === String(machineId)));
+};
+
+const canViewMachine = async (user, machineId) =>
+  ["admin", "owner", "general_manager"].includes(user.role) ||
+  isAssignedEmployee(user, machineId);
+
 const logActivity = (req, action, entityType, entityId, details = {}) =>
   ActivityLog.create({
     user: req.user?._id,
@@ -125,6 +135,10 @@ const getMachineById = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Machine not found");
   }
+  if (!(await canViewMachine(req.user, machine._id))) {
+    res.status(403);
+    throw new Error("You can only access machines assigned to you");
+  }
 
   const [maintenanceHistory, oilChangeHistory, spareHistory] =
     await Promise.all([
@@ -156,7 +170,6 @@ const updateMachine = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Machine not found");
   }
-
   Object.assign(machine, req.body);
   await machine.save();
 
@@ -180,6 +193,13 @@ const updateMachineStatus = asyncHandler(async (req, res) => {
   if (!machine) {
     res.status(404);
     throw new Error("Machine not found");
+  }
+  const canUpdateStatus =
+    ["admin", "owner"].includes(req.user.role) ||
+    (await isAssignedEmployee(req.user, machine._id));
+  if (!canUpdateStatus) {
+    res.status(403);
+    throw new Error("You can only update the status of an assigned machine");
   }
 
   machine.status = status;
