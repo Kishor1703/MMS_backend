@@ -13,7 +13,7 @@ const User = require("../models/User");
 (async () => {
   await mongoose.connect(process.env.MONGO_URI);
 
-  const email = process.env.OWNER_EMAIL || "owner@example.com";
+  const email = process.env.OWNER_EMAIL ;
   const existing = await User.findOne({ email });
   if (existing) {
     console.log(`Owner already exists: ${email}`);
@@ -24,12 +24,12 @@ const User = require("../models/User");
     name: process.env.OWNER_NAME || "System Owner",
     email,
     phoneNumber: process.env.OWNER_PHONE || "0000000000",
-    password: process.env.OWNER_PASSWORD || "ChangeMe123!",
+    password: process.env.OWNER_PASSWORD,
     role: "owner",
   });
 
   console.log("Owner account created:");
   console.log(`  email: ${owner.email}`);
-  console.log(`  password: ${process.env.OWNER_PASSWORD || "ChangeMe123!"} (change this immediately)`);
+  console.log(`  password: ${process.env.OWNER_PASSWORD} (change this immediately)`);
   process.exit(0);
 })();
