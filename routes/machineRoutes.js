@@ -3,6 +3,7 @@ const router = express.Router();
 const { protect, authorize } = require("../middleware/auth");
 const {
   createMachine,
+  getMachineCompanies,
   getMachines,
   getMachineById,
   updateMachine,
@@ -17,6 +18,8 @@ router
   .route("/")
   .get(getMachines)
   .post(authorize("admin"), createMachine);
+
+router.get("/companies", getMachineCompanies);
 
 router
   .route("/:id")

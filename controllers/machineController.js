@@ -5,6 +5,30 @@ const OilChange = require("../models/OilChange");
 const SparePart = require("../models/SparePart");
 const Employee = require("../models/Employee");
 const ActivityLog = require("../models/ActivityLog");
+const User = require("../models/User");
+
+// @desc    List company names used by active machines
+// @route   GET /api/machines/companies
+// @access  Private
+const getMachineCompanies = asyncHandler(async (_req, res) => {
+  const [machineCompanies, ownerCompanies] = await Promise.all([
+    Machine.distinct("company", {
+      isDeleted: false,
+      company: { $exists: true, $ne: "" },
+    }),
+    User.distinct("companyName", {
+      role: "owner",
+      isActive: true,
+      companyName: { $exists: true, $ne: "" },
+    }),
+  ]);
+  const companies = [...new Set([...machineCompanies, ...ownerCompanies])];
+
+  res.json({
+    success: true,
+    data: companies.sort((a, b) => a.localeCompare(b)),
+  });
+});
 
 const isAssignedEmployee = async (user, machineId) => {
   if (user.role !== "employee") return false;
@@ -84,11 +108,12 @@ const createMachine = asyncHandler(async (req, res) => {
 // @route   GET /api/machines
 // @access  Owner, Employee (employee sees only assigned machines)
 const getMachines = asyncHandler(async (req, res) => {
-  const { search, status, page = 1, limit = 20 } = req.query;
+  const { search, status, company, page = 1, limit = 20 } = req.query;
 
   const query = { isDeleted: false };
 
   if (status) query.status = status;
+  if (company) query.company = company;
 
   if (search) {
     query.$or = [
@@ -261,6 +286,7 @@ const assignMachine = asyncHandler(async (req, res) => {
 
 module.exports = {
   createMachine,
+  getMachineCompanies,
   getMachines,
   getMachineById,
   updateMachine,
