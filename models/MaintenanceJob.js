@@ -25,7 +25,9 @@ const maintenanceJobSchema = new mongoose.Schema(
     downtimeHours: { type: Number }, // auto-computed on save
 
     // Step 2 — Engineer timeline + Work done
-    engineerStarted:  { type: Date },
+    engineerStarted:  { type: Date, required: true },
+    engineerName:     { type: String, required: true, trim: true },
+    engineerPhone:    { type: String, required: true, trim: true },
     workDone:         { type: String, trim: true },
     engineerFinished: { type: Date },
 

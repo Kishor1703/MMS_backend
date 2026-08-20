@@ -16,7 +16,7 @@ router.use(protect);
 router
   .route("/")
   .get(getMachines)
-  .post(authorize("admin", "owner"), createMachine);
+  .post(authorize("admin"), createMachine);
 
 router
   .route("/:id")
