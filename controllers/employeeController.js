@@ -80,6 +80,7 @@ const createEmployee = asyncHandler(async (req, res) => {
       password,
       role: "employee",
       employee: employee._id,
+      profilePhoto: profilePhoto || "",
     });
     employee.user = user._id;
     await employee.save();

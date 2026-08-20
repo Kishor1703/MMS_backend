@@ -15,6 +15,16 @@ const generateToken = (id) =>
     expiresIn: process.env.JWT_EXPIRES_IN || "7d",
   });
 
+const resolveProfilePhoto = async (user) => {
+  if (user.profilePhoto || user.role !== "employee") return user.profilePhoto || "";
+
+  const employee = user.employee
+    ? await Employee.findById(user.employee).select("profilePhoto")
+    : await Employee.findOne({ user: user._id }).select("profilePhoto");
+
+  return employee?.profilePhoto || "";
+};
+
 // @desc    Register a new user (Owner creates Employee logins; first Owner
 //          account is typically seeded directly in the DB or via a setup script)
 // @route   POST /api/auth/register
@@ -143,6 +153,7 @@ const login = asyncHandler(async (req, res) => {
 
   user.lastLogin = new Date();
   await user.save({ validateBeforeSave: false });
+  const profilePhoto = await resolveProfilePhoto(user);
 
   res.json({
     success: true,
@@ -151,7 +162,7 @@ const login = asyncHandler(async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      profilePhoto: user.profilePhoto,
+      profilePhoto,
       token: generateToken(user._id),
     },
   });
@@ -161,7 +172,9 @@ const login = asyncHandler(async (req, res) => {
 // @route   GET /api/auth/me
 // @access  Private
 const getMe = asyncHandler(async (req, res) => {
-  res.json({ success: true, data: req.user });
+  const user = req.user.toObject();
+  user.profilePhoto = await resolveProfilePhoto(req.user);
+  res.json({ success: true, data: user });
 });
 
 // @desc    Change password (while logged in)
