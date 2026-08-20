@@ -3,6 +3,8 @@ const router = express.Router();
 const { protect, authorize } = require("../middleware/auth");
 const {
   register,
+  getManagedUsers,
+  deleteOwner,
   login,
   getMe,
   changePassword,
@@ -11,6 +13,8 @@ const {
 } = require("../controllers/authController");
 
 router.post("/register", protect, authorize("admin", "owner"), register);
+router.get("/users", protect, authorize("admin", "owner"), getManagedUsers);
+router.delete("/users/:id", protect, authorize("admin"), deleteOwner);
 router.post("/login", login);
 router.get("/me", protect, getMe);
 router.put("/change-password", protect, changePassword);

@@ -4,8 +4,14 @@ const Employee = require("../models/Employee");
 const Maintenance = require("../models/Maintenance");
 const OilChange = require("../models/OilChange");
 const ActivityLog = require("../models/ActivityLog");
+const User = require("../models/User");
 
 const getDashboardStats = asyncHandler(async (req, res) => {
+  if (req.user.role === "admin") {
+    const totalOwners = await User.countDocuments({ role: "owner", isActive: true });
+    return res.json({ success: true, data: { totalOwners } });
+  }
+
   const endOfToday = new Date();
   endOfToday.setHours(23, 59, 59, 999);
 

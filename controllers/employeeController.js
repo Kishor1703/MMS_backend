@@ -1,6 +1,8 @@
 const asyncHandler = require("express-async-handler");
+const mongoose = require("mongoose");
 const Employee = require("../models/Employee");
 const User = require("../models/User");
+const Machine = require("../models/Machine");
 
 const employeeScope = (req) =>
   req.user.role === "general_manager" ? { manager: req.user._id } : {};
@@ -18,11 +20,29 @@ const createEmployee = asyncHandler(async (req, res) => {
     designation,
     profilePhoto, manager,
     password,
+    assignedMachines = [],
   } = req.body;
 
   if (!employeeId || !name || !phoneNumber || !email) {
     res.status(400);
     throw new Error("employeeId, name, phoneNumber and email are required");
+  }
+
+  if (!Array.isArray(assignedMachines) || !assignedMachines.every(mongoose.isValidObjectId)) {
+    res.status(400);
+    throw new Error("assignedMachines must be an array of valid machine IDs");
+  }
+
+  const assignedMachineIds = [...new Set(assignedMachines.map(String))];
+  if (assignedMachineIds.length) {
+    const machineCount = await Machine.countDocuments({
+      _id: { $in: assignedMachineIds },
+      isDeleted: false,
+    });
+    if (machineCount !== assignedMachineIds.length) {
+      res.status(400);
+      throw new Error("One or more selected machines do not exist or are deleted");
+    }
   }
 
   const exists = await Employee.findOne({ $or: [{ employeeId }, { email }] });
@@ -40,8 +60,16 @@ const createEmployee = asyncHandler(async (req, res) => {
     department,
     designation,
     profilePhoto,
+    assignedMachines: assignedMachineIds,
     manager: req.user.role === "general_manager" ? req.user._id : manager,
   });
+
+  if (assignedMachineIds.length) {
+    await Machine.updateMany(
+      { _id: { $in: assignedMachineIds } },
+      { $addToSet: { assignedEmployees: employee._id } }
+    );
+  }
 
   // Create the linked login account if a password was supplied
   if (password) {
