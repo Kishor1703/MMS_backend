@@ -1,11 +1,13 @@
 const asyncHandler = require("express-async-handler");
 const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
+const mongoose = require("mongoose");
 const User = require("../models/User");
+const Employee = require("../models/Employee");
 
 const creatableRoles = {
-  admin: ["admin", "owner", "general_manager", "employee"],
-  owner: ["general_manager", "employee"],
+  admin: ["owner"],
+  owner: ["general_manager"],
 };
 
 const generateToken = (id) =>
@@ -18,12 +20,18 @@ const generateToken = (id) =>
 // @route   POST /api/auth/register
 // @access  Owner
 const register = asyncHandler(async (req, res) => {
-  const { name, email, phoneNumber, password, role, employee } = req.body;
+  const { name, phoneNumber, password, role, employee } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
   const targetRole = role || "employee";
+  const companyName = req.body.companyName?.trim();
 
   if (!creatableRoles[req.user.role]?.includes(targetRole)) {
     res.status(403);
     throw new Error("You are not permitted to create this account type");
+  }
+  if (targetRole === "owner" && !companyName) {
+    res.status(400);
+    throw new Error("companyName is required when creating an owner");
   }
 
   const existing = await User.findOne({ email });
@@ -39,6 +47,8 @@ const register = asyncHandler(async (req, res) => {
     password,
     role: targetRole,
     employee,
+    createdBy: req.user._id,
+    ...(targetRole === "owner" && { companyName }),
   });
 
   res.status(201).json({
@@ -51,6 +61,65 @@ const register = asyncHandler(async (req, res) => {
       token: generateToken(user._id),
     },
   });
+});
+
+// @desc    List accounts the current role is allowed to manage
+// @route   GET /api/auth/users?role=owner|general_manager
+// @access  Admin, Owner
+const getManagedUsers = asyncHandler(async (req, res) => {
+  const managedRole = req.user.role === "admin" ? "owner" : "general_manager";
+  if (req.query.role && req.query.role !== managedRole) {
+    res.status(403);
+    throw new Error("You are not permitted to view this account type");
+  }
+
+  const query = { role: managedRole, isActive: true };
+  if (req.user.role === "owner") query.createdBy = req.user._id;
+
+  const users = await User.find(query)
+    .select("name email phoneNumber companyName role createdAt")
+    .sort({ createdAt: -1 });
+  res.json({ success: true, data: users });
+});
+
+// @desc    Deactivate a company owner and all accounts below it
+// @route   DELETE /api/auth/users/:id
+// @access  Admin
+const deleteOwner = asyncHandler(async (req, res) => {
+  if (!mongoose.isValidObjectId(req.params.id)) {
+    res.status(400);
+    throw new Error("Invalid owner ID");
+  }
+
+  const owner = await User.findOne({
+    _id: req.params.id,
+    role: "owner",
+    isActive: true,
+  });
+  if (!owner) {
+    res.status(404);
+    throw new Error("Active company owner not found");
+  }
+
+  const generalManagers = await User.find({ createdBy: owner._id, role: "general_manager" })
+    .select("_id");
+  const managerIds = [owner._id, ...generalManagers.map((manager) => manager._id)];
+  const employees = await Employee.find({ manager: { $in: managerIds }, isActive: true }).select("_id user");
+
+  await Promise.all([
+    User.updateOne({ _id: owner._id }, { isActive: false }),
+    User.updateMany(
+      { _id: { $in: generalManagers.map((manager) => manager._id) } },
+      { isActive: false }
+    ),
+    Employee.updateMany({ _id: { $in: employees.map((employee) => employee._id) } }, { isActive: false }),
+    User.updateMany(
+      { _id: { $in: employees.map((employee) => employee.user).filter(Boolean) } },
+      { isActive: false }
+    ),
+  ]);
+
+  res.json({ success: true, message: "Company owner and related accounts deactivated" });
 });
 
 // @desc    Login (Owner or Employee)
@@ -162,6 +231,8 @@ const resetPassword = asyncHandler(async (req, res) => {
 
 module.exports = {
   register,
+  getManagedUsers,
+  deleteOwner,
   login,
   getMe,
   changePassword,

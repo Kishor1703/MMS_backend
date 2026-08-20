@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     phoneNumber: { type: String, required: true, trim: true },
+    companyName: { type: String, trim: true },
     password: { type: String, required: true, minlength: 6, select: false },
     role: {
       type: String,
@@ -24,6 +25,8 @@ const userSchema = new mongoose.Schema(
       default: "employee",
     },
     employee: { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
+    // The higher-level account that provisioned this account.
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
     profilePhoto: { type: String, default: "" },
     isActive: { type: Boolean, default: true },
     lastLogin: { type: Date },

@@ -9,13 +9,13 @@ const {
   deleteEmployee,
 } = require("../controllers/employeeController");
 
-router.use(protect, authorize("admin", "owner", "general_manager"));
+router.use(protect, authorize("general_manager"));
 
 router.route("/").get(getEmployees).post(createEmployee);
 router
   .route("/:id")
   .get(getEmployeeById)
-  .put(authorize("admin", "owner"), updateEmployee)
-  .delete(authorize("admin", "owner"), deleteEmployee);
+  .put(authorize("general_manager"), updateEmployee)
+  .delete(authorize("general_manager"), deleteEmployee);
 
 module.exports = router;
