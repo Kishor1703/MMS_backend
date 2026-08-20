@@ -57,9 +57,12 @@ const register = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 const login = asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
+  const email = req.body.email?.trim().toLowerCase();
+  const { password } = req.body;
 
-  const user = await User.findOne({ email }).select("+password");
+  const user = email && password
+    ? await User.findOne({ email }).select("+password")
+    : null;
   if (!user || !(await user.comparePassword(password))) {
     res.status(401);
     throw new Error("Invalid email or password");

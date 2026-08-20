@@ -1,35 +1,64 @@
 /**
- * One-time script to create the first Owner login, since the register
- * endpoint requires an existing Owner to be authenticated.
+ * Bootstrap script for the first Owner login, since the register endpoint
+ * requires an existing privileged user to be authenticated.
  *
- * Usage:  node utils/seedOwner.js
- * Reads OWNER_NAME / OWNER_EMAIL / OWNER_PHONE / OWNER_PASSWORD from env,
- * or falls back to the defaults below (change the password after first login).
+ * Usage:
+ *   npm run seed:owner
+ *   npm run seed:owner -- --reset-password
+ *
+ * Set BOOTSTRAP_OWNER_NAME, BOOTSTRAP_OWNER_EMAIL,
+ * BOOTSTRAP_OWNER_PHONE, and BOOTSTRAP_OWNER_PASSWORD only in the shell or
+ * in a temporary, git-ignored env file before running this script. The
+ * password is never printed. Existing accounts are left unchanged unless
+ * --reset-password is explicitly supplied.
  */
 require("dotenv").config();
+require("../config/mongoDns");
 const mongoose = require("mongoose");
 const User = require("../models/User");
 
 (async () => {
-  await mongoose.connect(process.env.MONGO_URI);
+  const email = process.env.BOOTSTRAP_OWNER_EMAIL?.trim().toLowerCase();
+  const password = process.env.BOOTSTRAP_OWNER_PASSWORD;
+  const resetPassword = process.argv.includes("--reset-password");
 
-  const email = process.env.OWNER_EMAIL ;
-  const existing = await User.findOne({ email });
-  if (existing) {
-    console.log(`Owner already exists: ${email}`);
-    process.exit(0);
+  if (!process.env.MONGO_URI) throw new Error("MONGO_URI is required");
+  if (!email || !password) {
+    throw new Error(
+      "BOOTSTRAP_OWNER_EMAIL and BOOTSTRAP_OWNER_PASSWORD are required"
+    );
+  }
+  if (password.length < 6) {
+    throw new Error("BOOTSTRAP_OWNER_PASSWORD must be at least 6 characters");
   }
 
-  const owner = await User.create({
-    name: process.env.OWNER_NAME || "System Owner",
-    email,
-    phoneNumber: process.env.OWNER_PHONE || "0000000000",
-    password: process.env.OWNER_PASSWORD,
-    role: "owner",
-  });
+  try {
+    await mongoose.connect(process.env.MONGO_URI);
+    const existing = await User.findOne({ email }).select("+password");
 
-  console.log("Owner account created:");
-  console.log(`  email: ${owner.email}`);
-  console.log(`  password: ${process.env.OWNER_PASSWORD} (change this immediately)`);
-  process.exit(0);
+    if (existing) {
+      if (!resetPassword) {
+        console.log(
+          `Owner already exists: ${email}. Use --reset-password to explicitly reset its password.`
+        );
+        return;
+      }
+
+      existing.password = password;
+      await existing.save();
+      console.log(`Password reset for existing owner: ${email}`);
+      return;
+    }
+
+    await User.create({
+      name: process.env.BOOTSTRAP_OWNER_NAME?.trim() || "System Owner",
+      email,
+      phoneNumber: process.env.BOOTSTRAP_OWNER_PHONE?.trim() || "0000000000",
+      password,
+      role: "owner",
+    });
+    console.log(`Owner account created: ${email}`);
+  } finally {
+    await mongoose.disconnect();
+  }
 })();
