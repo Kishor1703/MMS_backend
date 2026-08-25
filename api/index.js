@@ -1,13 +1,13 @@
 require("dotenv").config();
-require("./config/mongoDns");
+require("../config/mongoDns");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
 const path = require("path");
 
-const connectDB = require("./config/db");
-const { notFound, errorHandler } = require("./middleware/errorHandler");
+const connectDB = require("../config/db");
+const { notFound, errorHandler } = require("../middleware/errorHandler");
 
 connectDB();
 
@@ -26,17 +26,17 @@ app.use(
 );
 
 // Routes
-app.use("/api/auth", require("./routes/authRoutes"));
-app.use("/api/employees", require("./routes/employeeRoutes"));
-app.use("/api/machines", require("./routes/machineRoutes"));
-app.use("/api/maintenance", require("./routes/maintenanceRoutes"));
-app.use("/api/oil-changes", require("./routes/oilChangeRoutes"));
-app.use("/api/spare-parts", require("./routes/sparePartRoutes"));
-app.use("/api/maintenance-jobs", require("./routes/maintenanceJobRoutes"));
-app.use("/api/notifications", require("./routes/notificationRoutes"));
-app.use("/api/dashboard", require("./routes/dashboardRoutes"));
-app.use("/api/reports", require("./routes/reportRoutes"));
-app.use("/api/upload", require("./routes/uploadRoutes"));
+app.use("/api/auth", require("../routes/authRoutes"));
+app.use("/api/employees", require("../routes/employeeRoutes"));
+app.use("/api/machines", require("../routes/machineRoutes"));
+app.use("/api/maintenance", require("../routes/maintenanceRoutes"));
+app.use("/api/oil-changes", require("../routes/oilChangeRoutes"));
+app.use("/api/spare-parts", require("../routes/sparePartRoutes"));
+app.use("/api/maintenance-jobs", require("../routes/maintenanceJobRoutes"));
+app.use("/api/notifications", require("../routes/notificationRoutes"));
+app.use("/api/dashboard", require("../routes/dashboardRoutes"));
+app.use("/api/reports", require("../routes/reportRoutes"));
+app.use("/api/upload", require("../routes/uploadRoutes"));
 
 app.get("/api/health", (req, res) => res.json({ success: true, message: "API is running" }));
 
