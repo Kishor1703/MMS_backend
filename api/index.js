@@ -13,7 +13,35 @@ connectDB();
 
 const app = express();
 
-app.use(cors({ origin: process.env.CLIENT_URL || "*", credentials: true }));
+// Mobile Flutter clients do not need CORS, but browsers (including Flutter Web)
+// do. Reflect the request origin so development and deployed web clients work
+// with credentialed requests. `*` cannot be used together with credentials.
+const configuredOrigins = (process.env.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+const isLocalDevelopmentOrigin = (origin) =>
+  /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Requests from native apps/Postman have no Origin header. When no
+      // CLIENT_URL is configured, allow browser clients from any origin.
+      if (
+        !origin ||
+        configuredOrigins.length === 0 ||
+        configuredOrigins.includes(origin) ||
+        isLocalDevelopmentOrigin(origin)
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS origin not allowed: ${origin}`));
+    },
+    credentials: true,
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
@@ -43,5 +71,11 @@ app.get("/api/health", (req, res) => res.json({ success: true, message: "API is 
 app.use(notFound);
 app.use(errorHandler);
 
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+// Vercel invokes the exported Express app. Keep a local listener only when
+// this file is run directly for development.
+if (require.main === module) {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+module.exports = app;
