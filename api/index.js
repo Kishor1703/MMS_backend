@@ -42,16 +42,12 @@ app.use(
     credentials: true,
   })
 );
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Raised from the 100kb default so requests containing base64-encoded
+// images/files in the JSON body (e.g. SparePart.photo) aren't rejected.
+app.use(express.json({ limit: "10mb" }));
+app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(cookieParser());
 if (process.env.NODE_ENV !== "production") app.use(morgan("dev"));
-
-// Serve uploaded files statically
-app.use(
-  "/uploads",
-  express.static(path.join(__dirname, process.env.UPLOAD_DIR || "uploads"))
-);
 
 // Routes
 app.use("/api/auth", require("../routes/authRoutes"));

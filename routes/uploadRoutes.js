@@ -5,6 +5,12 @@ const upload = require("../middleware/upload");
 
 router.use(protect);
 
+// Encode a multer memory-storage file into a base64 data URI, e.g.
+// "data:image/png;base64,iVBORw0KG...". This string is what gets stored
+// directly in MongoDB (e.g. SparePart.photo) - no disk/file involved.
+const toDataUri = (file) =>
+  `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+
 // Single file: field name "file"
 router.post("/", upload.single("file"), (req, res) => {
   if (!req.file) {
@@ -14,8 +20,8 @@ router.post("/", upload.single("file"), (req, res) => {
   res.status(201).json({
     success: true,
     data: {
-      filename: req.file.filename,
-      url: `/uploads/${req.file.filename}`,
+      originalName: req.file.originalname,
+      data: toDataUri(req.file),
       mimetype: req.file.mimetype,
       size: req.file.size,
     },
@@ -25,8 +31,8 @@ router.post("/", upload.single("file"), (req, res) => {
 // Multiple files: field name "files"
 router.post("/multiple", upload.array("files", 10), (req, res) => {
   const files = (req.files || []).map((f) => ({
-    filename: f.filename,
-    url: `/uploads/${f.filename}`,
+    originalName: f.originalname,
+    data: toDataUri(f),
     mimetype: f.mimetype,
     size: f.size,
   }));
