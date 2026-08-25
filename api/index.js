@@ -1,10 +1,10 @@
-require("dotenv").config();
+const path = require("path");
+require("dotenv").config({ path: path.resolve(__dirname, ".env") });
 require("../config/mongoDns");
 const express = require("express");
 const cors = require("cors");
 const morgan = require("morgan");
 const cookieParser = require("cookie-parser");
-const path = require("path");
 
 const connectDB = require("../config/db");
 const { notFound, errorHandler } = require("../middleware/errorHandler");
@@ -66,7 +66,11 @@ app.use("/api/dashboard", require("../routes/dashboardRoutes"));
 app.use("/api/reports", require("../routes/reportRoutes"));
 app.use("/api/upload", require("../routes/uploadRoutes"));
 
-app.get("/api/health", (req, res) => res.json({ success: true, message: "API is running" }));
+const healthResponse = (req, res) =>
+  res.json({ success: true, message: "MMS API is running" });
+
+app.get("/", healthResponse);
+app.get("/api/health", healthResponse);
 
 app.use(notFound);
 app.use(errorHandler);
