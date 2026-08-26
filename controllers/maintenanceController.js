@@ -40,6 +40,12 @@ const createMaintenance = asyncHandler(async (req, res) => {
     delete reportData.approvedAt;
   }
   const record = await Maintenance.create(reportData);
+  // An employee logging an Idle maintenance record is reporting the current
+  // machine state as well, so keep the machine card in sync.
+  if (req.user.role === "employee" && record.maintenanceType === "Idle") {
+    machine.status = "Idle";
+    await machine.save();
+  }
   res.status(201).json({ success: true, data: record });
 });
 

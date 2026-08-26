@@ -81,6 +81,7 @@ const createEmployee = asyncHandler(async (req, res) => {
       role: "employee",
       employee: employee._id,
       profilePhoto: profilePhoto || "",
+      createdBy: req.user._id,
     });
     employee.user = user._id;
     await employee.save();
@@ -94,6 +95,7 @@ const createEmployee = asyncHandler(async (req, res) => {
 // @access  Owner
 const getEmployees = asyncHandler(async (req, res) => {
   const { search, department, page = 1, limit = 20 } = req.query;
+  const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const query = { isActive: true, ...employeeScope(req) };
 
   if (department) query.department = department;
@@ -104,20 +106,20 @@ const getEmployees = asyncHandler(async (req, res) => {
     ];
   }
 
-  const skip = (Number(page) - 1) * Number(limit);
+  const skip = (Number(page) - 1) * safeLimit;
   const [employees, total] = await Promise.all([
     Employee.find(query)
       .populate("assignedMachines", "machineName machineNumber status")
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(Number(limit)),
+      .limit(safeLimit),
     Employee.countDocuments(query),
   ]);
 
   res.json({
     success: true,
     data: employees,
-    pagination: { total, page: Number(page), pages: Math.ceil(total / limit) },
+    pagination: { total, page: Number(page), pages: Math.ceil(total / safeLimit) },
   });
 });
 

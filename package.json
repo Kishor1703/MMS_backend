@@ -7,10 +7,12 @@
     "start": "node api/index.js",
     "dev": "nodemon api/index.js",
     "seed:admin": "node utils/seedOwner.js",
-    "migrate:employees-to-gm": "node utils/assignLegacyEmployees.js"
+    "migrate:employees-to-gm": "node utils/assignLegacyEmployees.js",
+    "migrate:gms-to-owner": "node utils/assignLegacyGeneralManagers.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
+    "cloudinary": "^2.10.1",
     "cookie-parser": "^1.4.6",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

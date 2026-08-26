@@ -37,7 +37,7 @@ const isAssignedEmployee = async (user, machineId) => {
 };
 
 const canViewMachine = async (user, machineId) =>
-  ["admin", "owner", "general_manager"].includes(user.role) ||
+  user.role === "general_manager" ||
   isAssignedEmployee(user, machineId);
 
 const logActivity = (req, action, entityType, entityId, details = {}) =>
@@ -149,7 +149,7 @@ const getMachines = asyncHandler(async (req, res) => {
 
 // @desc    Get a single machine profile page (info + all related history)
 // @route   GET /api/machines/:id
-// @access  Owner, assigned Employee
+// @access  General Manager, assigned Employee
 const getMachineById = asyncHandler(async (req, res) => {
   const machine = await Machine.findOne({
     _id: req.params.id,
@@ -172,10 +172,15 @@ const getMachineById = asyncHandler(async (req, res) => {
       SparePart.find({ machine: machine._id }).sort({ replacementDate: -1 }),
     ]);
 
+  // Documents belong to the reporting workflow.  Do not send document URLs
+  // to Admin or Owner clients, even if they try to bypass the hidden tab.
+  const machineData = machine.toObject();
+  if (["admin", "owner"].includes(req.user.role)) delete machineData.documents;
+
   res.json({
     success: true,
     data: {
-      machine,
+      machine: machineData,
       maintenanceHistory,
       oilChangeHistory,
       spareHistory,
@@ -220,7 +225,7 @@ const updateMachineStatus = asyncHandler(async (req, res) => {
     throw new Error("Machine not found");
   }
   const canUpdateStatus =
-    ["admin", "owner"].includes(req.user.role) ||
+    req.user.role === "owner" ||
     (await isAssignedEmployee(req.user, machine._id));
   if (!canUpdateStatus) {
     res.status(403);

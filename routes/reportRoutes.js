@@ -6,6 +6,8 @@ const { requestReport, getReports, completeReport } = require("../controllers/re
 router.patch("/:id/complete", requireSchedulerKey, completeReport);
 
 router.use(protect);
-router.route("/").get(authorize("admin", "owner", "general_manager"), getReports).post(authorize("admin", "owner", "general_manager"), requestReport);
+// Generated exports are available to employees only.  Owners must not be
+// able to enter the report section.
+router.route("/").get(authorize("employee"), getReports).post(authorize("employee"), requestReport);
 
 module.exports = router;

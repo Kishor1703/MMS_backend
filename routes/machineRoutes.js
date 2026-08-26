@@ -24,10 +24,10 @@ router.get("/companies", getMachineCompanies);
 router
   .route("/:id")
   .get(getMachineById)
-  .put(authorize("admin", "owner"), updateMachine)
-  .delete(authorize("admin", "owner"), deleteMachine);
+  .put(authorize("owner"), updateMachine)
+  .delete(authorize("owner"), deleteMachine);
 
 router.patch("/:id/status", updateMachineStatus); // owner or assigned employee
-router.post("/:id/assign", authorize("admin", "owner"), assignMachine);
+router.post("/:id/assign", authorize("owner"), assignMachine);
 
 module.exports = router;

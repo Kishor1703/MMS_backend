@@ -10,7 +10,9 @@ const maintenanceSchema = new mongoose.Schema(
     maintenanceDate: { type: Date, required: true, default: Date.now },
     maintenanceType: {
       type: String,
-      enum: ["Preventive", "Corrective", "Breakdown", "Inspection", "Other"],
+      // Corrective remains accepted only for historical records. New entries
+      // use Idle instead (the frontend no longer offers Corrective).
+      enum: ["Preventive", "Idle", "Breakdown", "Inspection", "Other", "Corrective"],
       required: true,
     },
     description: { type: String, trim: true },

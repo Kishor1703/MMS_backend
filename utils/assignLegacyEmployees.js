@@ -5,7 +5,7 @@
  *   $env:MIGRATION_GENERAL_MANAGER_EMAIL="gm@company.com"
  *   npm run migrate:employees-to-gm
  */
-require("dotenv").config();
+require("dotenv").config({ path: require("path").resolve(__dirname, "../api/.env") });
 require("../config/mongoDns");
 const mongoose = require("mongoose");
 const User = require("../models/User");
