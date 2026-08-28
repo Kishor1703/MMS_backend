@@ -4,9 +4,12 @@ const { protect, authorize } = require("../middleware/auth");
 const {
   createMachine,
   getMachineCompanies,
+  getCompanyLayout,
+  saveCompanyLayout,
   getMachines,
   getMachineById,
   updateMachine,
+  updateMachineLayout,
   updateMachineStatus,
   deleteMachine,
   assignMachine,
@@ -20,6 +23,8 @@ router
   .post(authorize("admin"), createMachine);
 
 router.get("/companies", getMachineCompanies);
+router.get("/company-layout", getCompanyLayout);
+router.put("/company-layout", authorize("admin"), saveCompanyLayout);
 
 router
   .route("/:id")
@@ -27,6 +32,7 @@ router
   .put(authorize("owner"), updateMachine)
   .delete(authorize("owner"), deleteMachine);
 
+router.patch("/:id/layout", authorize("admin"), updateMachineLayout);
 router.patch("/:id/status", updateMachineStatus); // owner or assigned employee
 router.post("/:id/assign", authorize("owner"), assignMachine);
 

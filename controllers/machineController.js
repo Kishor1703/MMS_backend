@@ -6,6 +6,7 @@ const SparePart = require("../models/SparePart");
 const Employee = require("../models/Employee");
 const ActivityLog = require("../models/ActivityLog");
 const User = require("../models/User");
+const CompanyLayout = require("../models/CompanyLayout");
 
 // @desc    List company names used by active machines
 // @route   GET /api/machines/companies
@@ -30,6 +31,63 @@ const getMachineCompanies = asyncHandler(async (_req, res) => {
   });
 });
 
+// @desc    Get the saved layout for a company
+// @route   GET /api/machines/company-layout?company=...
+// @access  Private
+const getCompanyLayout = asyncHandler(async (req, res) => {
+  const company = req.query.company?.trim();
+  if (!company) {
+    res.status(400);
+    throw new Error("company is required");
+  }
+
+  const layout = await CompanyLayout.findOne({ company });
+  res.json({ success: true, data: layout });
+});
+
+// @desc    Save or update a company's layout
+// @route   PUT /api/machines/company-layout
+// @access  Admin
+const saveCompanyLayout = asyncHandler(async (req, res) => {
+  const company = req.body.company?.trim();
+  const layout = normalizeLayout(req.body.layoutWidth, req.body.layoutLength);
+
+  if (!company) {
+    res.status(400);
+    throw new Error("company is required");
+  }
+  if (!layout) {
+    res.status(400);
+    throw new Error("layoutWidth and layoutLength must be positive whole numbers");
+  }
+
+  const existing = await CompanyLayout.findOne({ company });
+  if (existing) {
+    if (!req.body.adminPassword) {
+      res.status(400);
+      throw new Error("Admin password is required to change the layout");
+    }
+    const admin = await User.findById(req.user._id).select("+password");
+    if (!admin || !(await admin.comparePassword(req.body.adminPassword))) {
+      res.status(401);
+      throw new Error("Admin password is incorrect");
+    }
+    existing.set({ ...layout, isLocked: true, lockedAt: new Date(), lockedBy: req.user._id });
+    await existing.save();
+  } else {
+    const created = await CompanyLayout.create({
+      company,
+      ...layout,
+      isLocked: true,
+      lockedAt: new Date(),
+      lockedBy: req.user._id,
+    });
+    return res.status(201).json({ success: true, data: created });
+  }
+
+  res.json({ success: true, data: existing });
+});
+
 const isAssignedEmployee = async (user, machineId) => {
   if (user.role !== "employee") return false;
   const employee = await Employee.findOne({ user: user._id, isActive: true });
@@ -50,6 +108,32 @@ const logActivity = (req, action, entityType, entityId, details = {}) =>
     ipAddress: req.ip,
   });
 
+const normalizeLayout = (layoutWidth, layoutLength) => {
+  const width = Number(layoutWidth);
+  const length = Number(layoutLength);
+
+  if (!Number.isInteger(width) || width < 1 || !Number.isInteger(length) || length < 1) {
+    return null;
+  }
+
+  return { width, length };
+};
+
+const getLayoutDisplayOrder = (machineNumber, width) => {
+  const number = Number(machineNumber);
+  if (!Number.isInteger(number) || number < 1 || !Number.isInteger(width) || width < 1) {
+    return Number.MAX_SAFE_INTEGER;
+  }
+
+  const offset = number - 1;
+  const rowBand = Math.floor(offset / (width * 2));
+  const positionInBand = offset % (width * 2);
+  const rowInBand = positionInBand % 2;
+  const column = width - 1 - Math.floor(positionInBand / 2);
+
+  return (rowBand * 2 + rowInBand) * width + column;
+};
+
 // @desc    Create a machine
 // @route   POST /api/machines
 // @access  Owner
@@ -67,6 +151,8 @@ const createMachine = asyncHandler(async (req, res) => {
     warrantyExpiry,
     machineImage,
     status,
+    layoutWidth,
+    layoutLength,
   } = req.body;
 
   if (!machineId || !machineName || !machineNumber) {
@@ -82,6 +168,8 @@ const createMachine = asyncHandler(async (req, res) => {
     throw new Error("A machine with this ID or number already exists");
   }
 
+  const layout = normalizeLayout(layoutWidth, layoutLength) || { width: 2, length: 2 };
+
   const machine = await Machine.create({
     machineId,
     machineName,
@@ -95,6 +183,12 @@ const createMachine = asyncHandler(async (req, res) => {
     warrantyExpiry,
     machineImage,
     status,
+    layout: {
+      ...layout,
+      isLocked: true,
+      lockedAt: new Date(),
+      lockedBy: req.user._id,
+    },
   });
 
   await logActivity(req, "CREATE_MACHINE", "Machine", machine._id, {
@@ -131,14 +225,27 @@ const getMachines = asyncHandler(async (req, res) => {
 
   const skip = (Number(page) - 1) * Number(limit);
 
-  const [machines, total] = await Promise.all([
+  const [loadedMachines, total, companyLayout] = await Promise.all([
     Machine.find(query)
       .populate("assignedEmployees", "name employeeId department")
       .sort({ createdAt: -1 })
-      .skip(skip)
-      .limit(Number(limit)),
+      .skip(company ? 0 : skip)
+      .limit(company ? 0 : Number(limit)),
     Machine.countDocuments(query),
+    company ? CompanyLayout.findOne({ company }).select("width") : null,
   ]);
+
+  let machines = loadedMachines;
+  if (company) {
+    const orderedMachines = [...loadedMachines];
+    if (companyLayout) {
+      orderedMachines.sort((a, b) =>
+        getLayoutDisplayOrder(a.machineNumber, companyLayout.width) -
+        getLayoutDisplayOrder(b.machineNumber, companyLayout.width)
+      );
+    }
+    machines = orderedMachines.slice(skip, skip + Number(limit));
+  }
 
   res.json({
     success: true,
@@ -200,10 +307,61 @@ const updateMachine = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Machine not found");
   }
-  Object.assign(machine, req.body);
+  const { layout, layoutWidth, layoutLength, ...safeUpdates } = req.body;
+  if (layout || layoutWidth || layoutLength) {
+    res.status(403);
+    throw new Error("Layout can only be changed with admin password");
+  }
+  Object.assign(machine, safeUpdates);
   await machine.save();
 
-  await logActivity(req, "UPDATE_MACHINE", "Machine", machine._id, req.body);
+  await logActivity(req, "UPDATE_MACHINE", "Machine", machine._id, safeUpdates);
+
+  res.json({ success: true, data: machine });
+});
+
+// @desc    Update a machine layout after password confirmation
+// @route   PATCH /api/machines/:id/layout
+// @access  Admin
+const updateMachineLayout = asyncHandler(async (req, res) => {
+  if (req.user.role !== "admin") {
+    res.status(403);
+    throw new Error("Only admin can change machine layout");
+  }
+
+  const { layoutWidth, layoutLength, adminPassword } = req.body;
+  const layout = normalizeLayout(layoutWidth, layoutLength);
+  if (!layout) {
+    res.status(400);
+    throw new Error("layoutWidth and layoutLength must be positive whole numbers");
+  }
+  if (!adminPassword) {
+    res.status(400);
+    throw new Error("Admin password is required to change the layout");
+  }
+
+  const admin = await User.findById(req.user._id).select("+password");
+  if (!admin || !(await admin.comparePassword(adminPassword))) {
+    res.status(401);
+    throw new Error("Admin password is incorrect");
+  }
+
+  const machine = await Machine.findOne({ _id: req.params.id, isDeleted: false });
+  if (!machine) {
+    res.status(404);
+    throw new Error("Machine not found");
+  }
+
+  machine.layout = {
+    ...(machine.layout?.toObject ? machine.layout.toObject() : machine.layout || {}),
+    ...layout,
+    isLocked: true,
+    lockedAt: new Date(),
+    lockedBy: req.user._id,
+  };
+  await machine.save();
+
+  await logActivity(req, "UPDATE_MACHINE_LAYOUT", "Machine", machine._id, layout);
 
   res.json({ success: true, data: machine });
 });
@@ -292,10 +450,13 @@ const assignMachine = asyncHandler(async (req, res) => {
 module.exports = {
   createMachine,
   getMachineCompanies,
+  getCompanyLayout,
+  saveCompanyLayout,
   getMachines,
   getMachineById,
   updateMachine,
   updateMachineStatus,
   deleteMachine,
   assignMachine,
+  updateMachineLayout,
 };

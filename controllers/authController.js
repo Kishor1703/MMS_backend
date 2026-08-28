@@ -194,6 +194,21 @@ const changePassword = asyncHandler(async (req, res) => {
   res.json({ success: true, message: "Password updated" });
 });
 
+// @desc    Confirm the current user's password without changing it
+// @route   POST /api/auth/verify-password
+// @access  Private
+const verifyPassword = asyncHandler(async (req, res) => {
+  const { password } = req.body;
+  const user = await User.findById(req.user._id).select("+password");
+
+  if (!password || !(await user.comparePassword(password))) {
+    res.status(401);
+    throw new Error("Password is incorrect");
+  }
+
+  res.json({ success: true, message: "Password confirmed" });
+});
+
 // @desc    Request a password reset token (emailed/SMS'd to the user in prod)
 // @route   POST /api/auth/forgot-password
 // @access  Public
@@ -249,6 +264,7 @@ module.exports = {
   login,
   getMe,
   changePassword,
+  verifyPassword,
   forgotPassword,
   resetPassword,
 };

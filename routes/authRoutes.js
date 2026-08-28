@@ -8,6 +8,7 @@ const {
   login,
   getMe,
   changePassword,
+  verifyPassword,
   forgotPassword,
   resetPassword,
 } = require("../controllers/authController");
@@ -18,6 +19,7 @@ router.delete("/users/:id", protect, authorize("admin"), deleteOwner);
 router.post("/login", login);
 router.get("/me", protect, getMe);
 router.put("/change-password", protect, changePassword);
+router.post("/verify-password", protect, verifyPassword);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password/:token", resetPassword);
 

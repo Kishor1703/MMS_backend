@@ -13,6 +13,13 @@ const machineSchema = new mongoose.Schema(
     installationDate: { type: Date },
     warrantyExpiry: { type: Date },
     machineImage: { type: String, default: "" },
+    layout: {
+      width: { type: Number, default: 2, min: 1 },
+      length: { type: Number, default: 2, min: 1 },
+      isLocked: { type: Boolean, default: true },
+      lockedAt: { type: Date },
+      lockedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+    },
     status: {
       type: String,
       enum: ["Running", "Under Maintenance", "Breakdown", "Idle"],
