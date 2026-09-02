@@ -50,7 +50,11 @@ const getCompanyLayout = asyncHandler(async (req, res) => {
 // @access  Admin
 const saveCompanyLayout = asyncHandler(async (req, res) => {
   const company = req.body.company?.trim();
-  const layout = normalizeLayout(req.body.layoutWidth, req.body.layoutLength);
+  const layout = normalizeLayout(
+    req.body.layoutWidth,
+    req.body.layoutLength,
+    req.body.machineCount
+  );
 
   if (!company) {
     res.status(400);
@@ -108,15 +112,20 @@ const logActivity = (req, action, entityType, entityId, details = {}) =>
     ipAddress: req.ip,
   });
 
-const normalizeLayout = (layoutWidth, layoutLength) => {
+const normalizeLayout = (layoutWidth, layoutLength, machineCount) => {
   const width = Number(layoutWidth);
   const length = Number(layoutLength);
+  const count = Number(machineCount);
 
   if (!Number.isInteger(width) || width < 1 || !Number.isInteger(length) || length < 1) {
     return null;
   }
 
-  return { width, length };
+  return {
+    width,
+    length,
+    machineCount: Number.isInteger(count) && count >= 1 ? count : width * length,
+  };
 };
 
 const getLayoutDisplayOrder = (machineNumber, width) => {
@@ -168,7 +177,12 @@ const createMachine = asyncHandler(async (req, res) => {
     throw new Error("A machine with this ID or number already exists");
   }
 
-  const layout = normalizeLayout(layoutWidth, layoutLength) || { width: 2, length: 2 };
+  const layout =
+    normalizeLayout(layoutWidth, layoutLength, req.body.machineCount) || {
+      width: 2,
+      length: 2,
+      machineCount: 4,
+    };
 
   const machine = await Machine.create({
     machineId,
@@ -307,8 +321,8 @@ const updateMachine = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Machine not found");
   }
-  const { layout, layoutWidth, layoutLength, ...safeUpdates } = req.body;
-  if (layout || layoutWidth || layoutLength) {
+  const { layout, layoutWidth, layoutLength, machineCount, ...safeUpdates } = req.body;
+  if (layout || layoutWidth || layoutLength || machineCount) {
     res.status(403);
     throw new Error("Layout can only be changed with admin password");
   }
@@ -329,8 +343,8 @@ const updateMachineLayout = asyncHandler(async (req, res) => {
     throw new Error("Only admin can change machine layout");
   }
 
-  const { layoutWidth, layoutLength, adminPassword } = req.body;
-  const layout = normalizeLayout(layoutWidth, layoutLength);
+  const { layoutWidth, layoutLength, adminPassword, machineCount } = req.body;
+  const layout = normalizeLayout(layoutWidth, layoutLength, machineCount);
   if (!layout) {
     res.status(400);
     throw new Error("layoutWidth and layoutLength must be positive whole numbers");

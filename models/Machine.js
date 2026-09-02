@@ -16,6 +16,7 @@ const machineSchema = new mongoose.Schema(
     layout: {
       width: { type: Number, default: 2, min: 1 },
       length: { type: Number, default: 2, min: 1 },
+      machineCount: { type: Number, min: 1 },
       isLocked: { type: Boolean, default: true },
       lockedAt: { type: Date },
       lockedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },

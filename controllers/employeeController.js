@@ -146,11 +146,96 @@ const updateEmployee = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Employee not found");
   }
-  // A general manager cannot reassign employees outside their team.
-  const updates = { ...req.body };
-  if (req.user.role === "general_manager") delete updates.manager;
-  Object.assign(employee, updates);
+  const {
+    employeeId,
+    name,
+    phoneNumber,
+    email,
+    department,
+    designation,
+    profilePhoto,
+    password,
+    assignedMachines = [],
+  } = req.body;
+
+  if (!employeeId || !name || !phoneNumber || !email) {
+    res.status(400);
+    throw new Error("employeeId, name, phoneNumber and email are required");
+  }
+  if (!Array.isArray(assignedMachines) || !assignedMachines.every(mongoose.isValidObjectId)) {
+    res.status(400);
+    throw new Error("assignedMachines must be an array of valid machine IDs");
+  }
+
+  const duplicate = await Employee.findOne({
+    _id: { $ne: employee._id },
+    $or: [{ employeeId }, { email }],
+  });
+  if (duplicate) {
+    res.status(409);
+    throw new Error("An employee with this ID or email already exists");
+  }
+
+  const assignedMachineIds = [...new Set(assignedMachines.map(String))];
+  if (assignedMachineIds.length) {
+    const machineCount = await Machine.countDocuments({
+      _id: { $in: assignedMachineIds },
+      isDeleted: false,
+    });
+    if (machineCount !== assignedMachineIds.length) {
+      res.status(400);
+      throw new Error("One or more selected machines do not exist or are deleted");
+    }
+  }
+
+  const previousMachineIds = employee.assignedMachines.map(String);
+  Object.assign(employee, {
+    employeeId,
+    name,
+    phoneNumber,
+    email,
+    department,
+    designation,
+    assignedMachines: assignedMachineIds,
+  });
+  if (profilePhoto !== undefined) employee.profilePhoto = profilePhoto;
   await employee.save();
+
+  const removedMachineIds = previousMachineIds.filter((id) => !assignedMachineIds.includes(id));
+  if (removedMachineIds.length) {
+    await Machine.updateMany(
+      { _id: { $in: removedMachineIds } },
+      { $pull: { assignedEmployees: employee._id } }
+    );
+  }
+  if (assignedMachineIds.length) {
+    await Machine.updateMany(
+      { _id: { $in: assignedMachineIds } },
+      { $addToSet: { assignedEmployees: employee._id } }
+    );
+  }
+
+  if (employee.user) {
+    const user = await User.findById(employee.user).select("+password");
+    if (user) {
+      Object.assign(user, { name, phoneNumber, email, profilePhoto: profilePhoto ?? employee.profilePhoto });
+      if (password) user.password = password;
+      await user.save();
+    }
+  } else if (password) {
+    const user = await User.create({
+      name,
+      email,
+      phoneNumber,
+      password,
+      role: "employee",
+      employee: employee._id,
+      profilePhoto: employee.profilePhoto || "",
+      createdBy: req.user._id,
+    });
+    employee.user = user._id;
+    await employee.save();
+  }
   res.json({ success: true, data: employee });
 });
 
