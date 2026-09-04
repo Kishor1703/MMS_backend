@@ -8,9 +8,11 @@ const {
   updateMaintenance,
   deleteMaintenance,
   getDueMaintenance,
+  markReminderSent,
 } = require("../controllers/maintenanceController");
 
 router.get("/due/today", requireSchedulerKey, getDueMaintenance);
+router.patch("/:id/mark-reminder-sent", requireSchedulerKey, markReminderSent);
 
 router.use(protect);
 

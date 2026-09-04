@@ -101,6 +101,10 @@ const updateMaintenance = asyncHandler(async (req, res) => {
   await assertReportAccess(req, res, record);
   const updates = { ...req.body };
   if (!["admin", "owner"].includes(req.user.role)) delete updates.performedBy;
+  if (Object.prototype.hasOwnProperty.call(updates, "nextMaintenanceDate")) {
+    updates.reminderSent = false;
+    updates.reminderSentAt = undefined;
+  }
   if (req.user.role === "employee") {
     delete updates.approvalStatus;
     delete updates.approvedBy;
@@ -136,12 +140,25 @@ const getDueMaintenance = asyncHandler(async (req, res) => {
 
   const due = await Maintenance.find({
     nextMaintenanceDate: { $lte: endOfToday, $ne: null },
+    reminderSent: false,
   }).populate({
     path: "machine",
     populate: { path: "assignedEmployees", select: "name phoneNumber email" },
   });
 
   res.json({ success: true, data: due });
+});
+
+const markReminderSent = asyncHandler(async (req, res) => {
+  const record = await Maintenance.findById(req.params.id);
+  if (!record) {
+    res.status(404);
+    throw new Error("Maintenance record not found");
+  }
+  record.reminderSent = true;
+  record.reminderSentAt = new Date();
+  await record.save({ validateBeforeSave: false });
+  res.json({ success: true, data: record });
 });
 
 module.exports = {
@@ -151,4 +168,5 @@ module.exports = {
   updateMaintenance,
   deleteMaintenance,
   getDueMaintenance,
+  markReminderSent,
 };
