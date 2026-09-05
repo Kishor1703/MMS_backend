@@ -29,8 +29,8 @@ router.put("/company-layout", authorize("admin"), saveCompanyLayout);
 router
   .route("/:id")
   .get(getMachineById)
-  .put(authorize("owner"), updateMachine)
-  .delete(authorize("owner"), deleteMachine);
+  .put(authorize("admin", "owner"), updateMachine)
+  .delete(authorize("admin"), deleteMachine);
 
 router.patch("/:id/layout", authorize("admin"), updateMachineLayout);
 router.patch("/:id/status", updateMachineStatus); // owner or assigned employee

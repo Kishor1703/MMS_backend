@@ -7,6 +7,10 @@ const currentEmployee = (userId) =>
   Employee.findOne({ user: userId, isActive: true });
 
 const canManageJob = async (user, job) => {
+  if (["admin", "owner"].includes(user.role)) {
+    return true;
+  }
+
   if (user.role === "employee") {
     const employee = await currentEmployee(user._id);
     return String(job.performedBy) === String(employee?._id);
@@ -40,6 +44,11 @@ const createMaintenanceJob = asyncHandler(async (req, res) => {
     machine: machine._id,
     whyStopped: req.body.whyStopped,
     sparesUsed: req.body.sparesUsed || [],
+    laborCost: req.body.laborCost,
+    sparePartsCost: req.body.sparePartsCost,
+    otherCost: req.body.otherCost,
+    nextMaintenanceDate: req.body.nextMaintenanceDate,
+    jobStatus: req.body.jobStatus,
     performedBy: employee._id,
   });
   res.status(201).json({ success: true, data: job });
@@ -108,6 +117,11 @@ const updateMaintenanceJob = asyncHandler(async (req, res) => {
   const updates = {};
   if (typeof req.body.whyStopped === "string") updates.whyStopped = req.body.whyStopped;
   if (Array.isArray(req.body.sparesUsed)) updates.sparesUsed = req.body.sparesUsed;
+  if (req.body.laborCost !== undefined) updates.laborCost = req.body.laborCost;
+  if (req.body.sparePartsCost !== undefined) updates.sparePartsCost = req.body.sparePartsCost;
+  if (req.body.otherCost !== undefined) updates.otherCost = req.body.otherCost;
+  if (req.body.nextMaintenanceDate !== undefined) updates.nextMaintenanceDate = req.body.nextMaintenanceDate;
+  if (req.body.jobStatus !== undefined) updates.jobStatus = req.body.jobStatus;
   Object.assign(job, updates);
   await job.save();
   res.json({ success: true, data: job });

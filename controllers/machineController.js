@@ -99,7 +99,7 @@ const isAssignedEmployee = async (user, machineId) => {
 };
 
 const canViewMachine = async (user, machineId) =>
-  user.role === "general_manager" ||
+  ["admin", "owner", "general_manager"].includes(user.role) ||
   isAssignedEmployee(user, machineId);
 
 const logActivity = (req, action, entityType, entityId, details = {}) =>
@@ -149,6 +149,7 @@ const getLayoutDisplayOrder = (machineNumber, width) => {
 const createMachine = asyncHandler(async (req, res) => {
   const {
     machineId,
+    assetType = "Machine",
     machineName,
     machineNumber,
     machineType,
@@ -164,13 +165,19 @@ const createMachine = asyncHandler(async (req, res) => {
     layoutLength,
   } = req.body;
 
-  if (!machineId || !machineName || !machineNumber) {
+  const equipmentNumber = assetType === "Machine" ? machineNumber : (machineNumber || machineId);
+  if (!machineId || !machineName || !equipmentNumber) {
     res.status(400);
-    throw new Error("machineId, machineName and machineNumber are required");
+    throw new Error("machineId and machineName are required");
+  }
+
+  if (!["Machine", "Compressor", "Air Dryer"].includes(assetType)) {
+    res.status(400);
+    throw new Error("assetType must be Machine, Compressor, or Air Dryer");
   }
 
   const exists = await Machine.findOne({
-    $or: [{ machineId }, { machineNumber }],
+    $or: [{ machineId }, { machineNumber: equipmentNumber }],
   });
   if (exists) {
     res.status(409);
@@ -185,9 +192,10 @@ const createMachine = asyncHandler(async (req, res) => {
     };
 
   const machine = await Machine.create({
+    assetType,
     machineId,
     machineName,
-    machineNumber,
+    machineNumber: equipmentNumber,
     machineType,
     company,
     modelNumber,
@@ -216,12 +224,17 @@ const createMachine = asyncHandler(async (req, res) => {
 // @route   GET /api/machines
 // @access  Owner, Employee (employee sees only assigned machines)
 const getMachines = asyncHandler(async (req, res) => {
-  const { search, status, company, page = 1, limit = 20 } = req.query;
+  const { search, status, company, assetType, page = 1, limit = 20 } = req.query;
 
   const query = { isDeleted: false };
 
   if (status) query.status = status;
   if (company) query.company = company;
+  if (assetType === "Machine") {
+    query.$and = [{ $or: [{ assetType: "Machine" }, { assetType: { $exists: false } }] }];
+  } else if (assetType) {
+    query.assetType = assetType;
+  }
 
   if (search) {
     query.$or = [
@@ -293,10 +306,7 @@ const getMachineById = asyncHandler(async (req, res) => {
       SparePart.find({ machine: machine._id }).sort({ replacementDate: -1 }),
     ]);
 
-  // Documents belong to the reporting workflow.  Do not send document URLs
-  // to Admin or Owner clients, even if they try to bypass the hidden tab.
   const machineData = machine.toObject();
-  if (["admin", "owner"].includes(req.user.role)) delete machineData.documents;
 
   res.json({
     success: true,

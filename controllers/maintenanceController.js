@@ -32,7 +32,21 @@ const createMaintenance = asyncHandler(async (req, res) => {
     }
     performedBy = employee._id;
   }
+  const category = req.body.maintenanceCategory || "General";
+  if (["Compressor", "Air Dryer"].includes(category)) {
+    if (!Array.isArray(req.body.componentsChecked) || req.body.componentsChecked.length === 0) {
+      res.status(400);
+      throw new Error("Select at least one component to inspect");
+    }
+    const expectedType = category === "Compressor" ? "Compressor Maintenance" : "Air Dryer Maintenance";
+    if (req.body.maintenanceType !== expectedType) {
+      res.status(400);
+      throw new Error("Invalid specialized maintenance type");
+    }
+  }
   const reportData = { ...req.body, performedBy };
+  reportData.maintenanceCategory = category;
+  if (category !== "General") reportData.engineerName = req.body.engineerName || req.user.name;
   if (req.user.role === "employee") {
     // Only a manager or admin may approve/reject a submitted employee report.
     reportData.approvalStatus = "Submitted";
@@ -100,6 +114,7 @@ const updateMaintenance = asyncHandler(async (req, res) => {
   }
   await assertReportAccess(req, res, record);
   const updates = { ...req.body };
+  if (updates.cost !== undefined) updates.cost = Number(updates.cost) || 0;
   if (!["admin", "owner"].includes(req.user.role)) delete updates.performedBy;
   if (req.user.role === "employee") {
     delete updates.approvalStatus;

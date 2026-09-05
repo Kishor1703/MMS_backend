@@ -16,12 +16,12 @@ router.use(protect);
 // their general manager is the only role that can amend it.
 router
   .route("/")
-  .get(authorize("employee", "general_manager"), getMaintenanceJobs)
+  .get(authorize("admin", "owner", "general_manager", "employee"), getMaintenanceJobs)
   .post(authorize("employee"), createMaintenanceJob);
 router
   .route("/:id")
-  .get(authorize("employee", "general_manager"), getMaintenanceJobById)
-  .put(authorize("general_manager"), updateMaintenanceJob)
-  .delete(authorize("general_manager"), deleteMaintenanceJob);
+  .get(authorize("admin", "owner", "general_manager", "employee"), getMaintenanceJobById)
+  .put(authorize("admin", "owner", "general_manager"), updateMaintenanceJob)
+  .delete(authorize("admin", "owner", "general_manager"), deleteMaintenanceJob);
 
 module.exports = router;
