@@ -53,6 +53,8 @@ const maintenanceSchema = new mongoose.Schema(
     description: { type: String, trim: true },
     machineRunningHours: { type: Number },
     nextMaintenanceDate: { type: Date },
+    reminderSent: { type: Boolean, default: false },
+    reminderSentAt: { type: Date },
     technicianName: { type: String, trim: true },
     remarks: { type: String, trim: true },
     cost: { type: Number, default: 0 },
