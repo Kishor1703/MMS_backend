@@ -6,8 +6,9 @@ const { requestReport, getReports, completeReport } = require("../controllers/re
 router.patch("/:id/complete", requireSchedulerKey, completeReport);
 
 router.use(protect);
-// Generated exports are available to employees only.  Owners must not be
-// able to enter the report section.
-router.route("/").get(authorize("employee"), getReports).post(authorize("employee"), requestReport);
+// Report access: admin sees everything, owner & manager view/export,
+// employees only see their own generated reports.
+const REPORT_ROLES = ["admin", "employee", "general_manager", "owner"];
+router.route("/").get(authorize(...REPORT_ROLES), getReports).post(authorize(...REPORT_ROLES), requestReport);
 
 module.exports = router;

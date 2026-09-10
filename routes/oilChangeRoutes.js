@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { protect, authorize, requireSchedulerKey } = require("../middleware/auth");
+const { protect, requireSchedulerKey } = require("../middleware/auth");
 const {
   createOilChange,
   getOilChanges,
@@ -24,6 +24,6 @@ router
   .route("/:id")
   .get(getOilChangeById)
   .put(updateOilChange)
-  .delete(authorize("owner"), deleteOilChange);
+  .delete(deleteOilChange);
 
 module.exports = router;

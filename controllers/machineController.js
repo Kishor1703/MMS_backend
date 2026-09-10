@@ -3,6 +3,9 @@ const Machine = require("../models/Machine");
 const Maintenance = require("../models/Maintenance");
 const OilChange = require("../models/OilChange");
 const SparePart = require("../models/SparePart");
+const MaintenanceJob = require("../models/MaintenanceJob");
+const CompressorMaintenance = require("../models/CompressorMaintenance");
+const AirDryerMaintenance = require("../models/AirDryerMaintenance");
 const Employee = require("../models/Employee");
 const ActivityLog = require("../models/ActivityLog");
 const User = require("../models/User");
@@ -99,6 +102,8 @@ const isAssignedEmployee = async (user, machineId) => {
 };
 
 const canViewMachine = async (user, machineId) =>
+  user.role === "admin" ||
+  user.role === "owner" ||
   user.role === "general_manager" ||
   isAssignedEmployee(user, machineId);
 
@@ -151,6 +156,7 @@ const createMachine = asyncHandler(async (req, res) => {
     machineId,
     machineName,
     machineNumber,
+    machineCategory,
     machineType,
     company,
     modelNumber,
@@ -162,6 +168,31 @@ const createMachine = asyncHandler(async (req, res) => {
     status,
     layoutWidth,
     layoutLength,
+    section,
+    shed,
+    brand,
+    loomType,
+    rpm,
+    width,
+    assignedEngineer,
+    notes,
+    pressure,
+    temperature,
+    oilLevel,
+    oilFilterStatus,
+    airFilterStatus,
+    separatorCondition,
+    differentialPressure,
+    oilCarryoverStatus,
+    separatorElementStatus,
+    oRingOrSealStatus,
+    coolantLevel,
+    inletPressure,
+    outletPressure,
+    dewPoint,
+    drainStatus,
+    filterCondition,
+    cleaningStatus,
   } = req.body;
 
   if (!machineId || !machineName || !machineNumber) {
@@ -188,6 +219,7 @@ const createMachine = asyncHandler(async (req, res) => {
     machineId,
     machineName,
     machineNumber,
+    machineCategory: machineCategory || "loom",
     machineType,
     company,
     modelNumber,
@@ -197,6 +229,31 @@ const createMachine = asyncHandler(async (req, res) => {
     warrantyExpiry,
     machineImage,
     status,
+    section,
+    shed,
+    brand,
+    loomType,
+    rpm,
+    width,
+    assignedEngineer,
+    notes,
+    pressure,
+    temperature,
+    oilLevel,
+    oilFilterStatus,
+    airFilterStatus,
+    separatorCondition,
+    differentialPressure,
+    oilCarryoverStatus,
+    separatorElementStatus,
+    oRingOrSealStatus,
+    coolantLevel,
+    inletPressure,
+    outletPressure,
+    dewPoint,
+    drainStatus,
+    filterCondition,
+    cleaningStatus,
     layout: {
       ...layout,
       isLocked: true,
@@ -216,18 +273,22 @@ const createMachine = asyncHandler(async (req, res) => {
 // @route   GET /api/machines
 // @access  Owner, Employee (employee sees only assigned machines)
 const getMachines = asyncHandler(async (req, res) => {
-  const { search, status, company, page = 1, limit = 20 } = req.query;
+  const { search, status, company, section, category, page = 1, limit = 20 } = req.query;
 
   const query = { isDeleted: false };
 
   if (status) query.status = status;
   if (company) query.company = company;
+  if (section) query.section = section;
+  if (category) query.machineCategory = category;
 
   if (search) {
     query.$or = [
       { machineName: { $regex: search, $options: "i" } },
       { machineNumber: { $regex: search, $options: "i" } },
       { machineType: { $regex: search, $options: "i" } },
+      { section: { $regex: search, $options: "i" } },
+      { shed: { $regex: search, $options: "i" } },
     ];
   }
 
@@ -281,17 +342,40 @@ const getMachineById = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Machine not found");
   }
-  if (!(await canViewMachine(req.user, machine._id))) {
+  const canManageMachine = ["admin", "owner"].includes(req.user.role);
+  if (!canManageMachine && !(await canViewMachine(req.user, machine._id))) {
     res.status(403);
     throw new Error("You can only access machines assigned to you");
   }
 
-  const [maintenanceHistory, oilChangeHistory, spareHistory] =
+  const [maintenanceHistory, oilChangeHistory, spareHistory, maintenanceJobs, compressorMaintenance, airDryerMaintenance] =
     await Promise.all([
       Maintenance.find({ machine: machine._id }).sort({ maintenanceDate: -1 }),
       OilChange.find({ machine: machine._id }).sort({ oilChangeDate: -1 }),
       SparePart.find({ machine: machine._id }).sort({ replacementDate: -1 }),
+      MaintenanceJob.find({ machine: machine._id }),
+      CompressorMaintenance.find({ machine: machine._id }).sort({ maintenanceDate: -1 }),
+      AirDryerMaintenance.find({ machine: machine._id }).sort({ maintenanceDate: -1 }),
     ]);
+
+  const totalSpareCost =
+    spareHistory.reduce(
+      (sum, s) => sum + (Number(s.price) || 0) * (Number(s.quantity) || 0),
+      0
+    ) +
+    maintenanceJobs.reduce(
+      (sum, job) =>
+        sum +
+        (job.sparesUsed || []).reduce(
+          (jobSum, s) =>
+            jobSum +
+            (Number(s.totalCost) ||
+              (Number(s.price) || 0) * (Number(s.quantity) || 0)),
+          0
+        ),
+      0
+    );
+  const totalJobCount = maintenanceJobs.length;
 
   // Documents belong to the reporting workflow.  Do not send document URLs
   // to Admin or Owner clients, even if they try to bypass the hidden tab.
@@ -308,6 +392,12 @@ const getMachineById = asyncHandler(async (req, res) => {
       upcomingMaintenance: maintenanceHistory
         .filter((m) => m.nextMaintenanceDate && m.nextMaintenanceDate > new Date())
         .sort((a, b) => a.nextMaintenanceDate - b.nextMaintenanceDate)[0] || null,
+      costSummary: {
+        totalSpareCost,
+        totalJobCount,
+      },
+      compressorMaintenance,
+      airDryerMaintenance,
     },
   });
 });
@@ -380,12 +470,12 @@ const updateMachineLayout = asyncHandler(async (req, res) => {
   res.json({ success: true, data: machine });
 });
 
-// @desc    Update machine status only (Running/Under Maintenance/Breakdown/Idle)
+// @desc    Update machine status only (Running/Stopped/Under Maintenance/Breakdown/Idle)
 // @route   PATCH /api/machines/:id/status
-// @access  Owner, assigned Employee
+// @access  Admin, assigned Employee
 const updateMachineStatus = asyncHandler(async (req, res) => {
   const { status } = req.body;
-  const allowed = ["Running", "Under Maintenance", "Breakdown", "Idle"];
+  const allowed = ["Running", "Stopped", "Under Maintenance", "Breakdown", "Idle"];
   if (!allowed.includes(status)) {
     res.status(400);
     throw new Error(`status must be one of: ${allowed.join(", ")}`);
@@ -397,7 +487,7 @@ const updateMachineStatus = asyncHandler(async (req, res) => {
     throw new Error("Machine not found");
   }
   const canUpdateStatus =
-    req.user.role === "owner" ||
+    req.user.role === "admin" ||
     (await isAssignedEmployee(req.user, machine._id));
   if (!canUpdateStatus) {
     res.status(403);
@@ -461,6 +551,62 @@ const assignMachine = asyncHandler(async (req, res) => {
   res.json({ success: true, data: machine });
 });
 
+// @desc    Attach uploaded document URLs to a machine
+// @route   POST /api/machines/:id/documents
+// @access  General Manager, assigned Employee
+const addMachineDocuments = asyncHandler(async (req, res) => {
+  const { documents } = req.body;
+  if (!Array.isArray(documents) || documents.length === 0) {
+    res.status(400);
+    throw new Error("documents must be a non-empty array of URLs");
+  }
+  const machine = await Machine.findOne({ _id: req.params.id, isDeleted: false });
+  if (!machine) {
+    res.status(404);
+    throw new Error("Machine not found");
+  }
+  if (!(await canViewMachine(req.user, machine._id))) {
+    res.status(403);
+    throw new Error("You can only update machines assigned to you");
+  }
+
+  machine.documents = [...new Set([...(machine.documents || []), ...documents])];
+  await machine.save();
+
+  await logActivity(req, "UPLOAD_DOCUMENT", "Machine", machine._id, {
+    count: documents.length,
+  });
+
+  res.json({ success: true, data: machine });
+});
+
+// @desc    Remove a document URL from a machine
+// @route   DELETE /api/machines/:id/documents
+// @access  General Manager, assigned Employee
+const removeMachineDocument = asyncHandler(async (req, res) => {
+  const { url } = req.body;
+  if (!url) {
+    res.status(400);
+    throw new Error("url is required");
+  }
+  const machine = await Machine.findOne({ _id: req.params.id, isDeleted: false });
+  if (!machine) {
+    res.status(404);
+    throw new Error("Machine not found");
+  }
+  if (!(await canViewMachine(req.user, machine._id))) {
+    res.status(403);
+    throw new Error("You can only update machines assigned to you");
+  }
+
+  machine.documents = (machine.documents || []).filter((doc) => doc !== url);
+  await machine.save();
+
+  await logActivity(req, "DELETE_DOCUMENT", "Machine", machine._id, { url });
+
+  res.json({ success: true, data: machine });
+});
+
 module.exports = {
   createMachine,
   getMachineCompanies,
@@ -473,4 +619,6 @@ module.exports = {
   deleteMachine,
   assignMachine,
   updateMachineLayout,
+  addMachineDocuments,
+  removeMachineDocument,
 };

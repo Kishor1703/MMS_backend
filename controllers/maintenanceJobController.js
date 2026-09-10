@@ -2,11 +2,14 @@ const asyncHandler = require("express-async-handler");
 const MaintenanceJob = require("../models/MaintenanceJob");
 const Machine = require("../models/Machine");
 const Employee = require("../models/Employee");
+const { logActivity } = require("../utils/audit");
 
 const currentEmployee = (userId) =>
   Employee.findOne({ user: userId, isActive: true });
 
 const canManageJob = async (user, job) => {
+  if (user.role === "admin") return true;
+
   if (user.role === "employee") {
     const employee = await currentEmployee(user._id);
     return String(job.performedBy) === String(employee?._id);
@@ -19,6 +22,11 @@ const canManageJob = async (user, job) => {
   }
 
   return false;
+};
+
+const canViewJob = async (user, job) => {
+  if (user.role === "admin" || user.role === "owner") return true;
+  return canManageJob(user, job);
 };
 
 // POST /api/maintenance-jobs
@@ -41,6 +49,10 @@ const createMaintenanceJob = asyncHandler(async (req, res) => {
     whyStopped: req.body.whyStopped,
     sparesUsed: req.body.sparesUsed || [],
     performedBy: employee._id,
+  });
+  logActivity(req, "CREATE_WORK_REPORT", "MaintenanceJob", job._id, {
+    machine: machine._id,
+    whyStopped: job.whyStopped,
   });
   res.status(201).json({ success: true, data: job });
 });
@@ -86,7 +98,7 @@ const getMaintenanceJobById = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Maintenance job not found");
   }
-  if (!(await canManageJob(req.user, job))) {
+  if (!(await canViewJob(req.user, job))) {
     res.status(403);
     throw new Error("You are not permitted to access this employee report");
   }

@@ -2,6 +2,7 @@ const asyncHandler = require("express-async-handler");
 const Maintenance = require("../models/Maintenance");
 const Machine = require("../models/Machine");
 const Employee = require("../models/Employee");
+const { logActivity } = require("../utils/audit");
 
 const getEmployee = (userId) => Employee.findOne({ user: userId, isActive: true });
 
@@ -40,6 +41,10 @@ const createMaintenance = asyncHandler(async (req, res) => {
     delete reportData.approvedAt;
   }
   const record = await Maintenance.create(reportData);
+  logActivity(req, "CREATE_MAINTENANCE", "Maintenance", record._id, {
+    machine: machine._id,
+    maintenanceType: record.maintenanceType,
+  });
   // An employee logging an Idle maintenance record is reporting the current
   // machine state as well, so keep the machine card in sync.
   if (req.user.role === "employee" && record.maintenanceType === "Idle") {
@@ -50,9 +55,34 @@ const createMaintenance = asyncHandler(async (req, res) => {
 });
 
 const getMaintenanceRecords = asyncHandler(async (req, res) => {
-  const { machine, page = 1, limit = 20 } = req.query;
+  const { machine, category, type, from, to, due, page = 1, limit = 20 } = req.query;
   const query = {};
   if (machine) query.machine = machine;
+  if (type) query.maintenanceType = type;
+  if (from || to) {
+    query.maintenanceDate = { ...(from && { $gte: new Date(from) }), ...(to && { $lte: new Date(to) }) };
+  }
+
+  if (category) {
+    const machineIds = await Machine.find({
+      machineCategory: category,
+      isDeleted: false,
+    }).distinct("_id");
+    query.machine = { $in: machineIds };
+  }
+
+  if (due) {
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    const weekEnd = new Date(start);
+    weekEnd.setDate(start.getDate() + 7);
+    if (due === "overdue") query.nextMaintenanceDate = { $lt: start, $ne: null };
+    else if (due === "today") query.nextMaintenanceDate = { $gte: start, $lte: end };
+    else if (due === "week") query.nextMaintenanceDate = { $gt: end, $lte: weekEnd, $ne: null };
+    else if (due === "upcoming") query.nextMaintenanceDate = { $gt: weekEnd, $ne: null };
+  }
 
   if (req.user.role === "employee") {
     const employee = await getEmployee(req.user._id);
@@ -65,7 +95,7 @@ const getMaintenanceRecords = asyncHandler(async (req, res) => {
   const skip = (Number(page) - 1) * Number(limit);
   const [records, total] = await Promise.all([
     Maintenance.find(query)
-      .populate("machine", "machineName machineNumber")
+      .populate("machine", "machineName machineNumber machineCategory section")
       .populate("performedBy", "name employeeId")
       .sort({ maintenanceDate: -1 })
       .skip(skip)
@@ -120,6 +150,7 @@ const updateMaintenance = asyncHandler(async (req, res) => {
   }
   Object.assign(record, updates);
   await record.save();
+  logActivity(req, "UPDATE_MAINTENANCE", "Maintenance", record._id, { updates });
   res.json({ success: true, data: record });
 });
 
@@ -129,7 +160,11 @@ const deleteMaintenance = asyncHandler(async (req, res) => {
     res.status(404);
     throw new Error("Maintenance record not found");
   }
+  await assertReportAccess(req, res, record);
   await record.deleteOne();
+  logActivity(req, "DELETE_MAINTENANCE", "Maintenance", record._id, {
+    machine: record.machine,
+  });
   res.json({ success: true, message: "Maintenance record deleted" });
 });
 

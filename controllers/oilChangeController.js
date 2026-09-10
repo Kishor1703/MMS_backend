@@ -140,12 +140,19 @@ const updateOilChange = asyncHandler(async (req, res) => {
 
 // @desc    Delete an oil change record
 // @route   DELETE /api/oil-changes/:id
-// @access  Owner
+// @access  Owner, General Manager, own records by Employee
 const deleteOilChange = asyncHandler(async (req, res) => {
   const record = await OilChange.findById(req.params.id);
   if (!record) {
     res.status(404);
     throw new Error("Oil change record not found");
+  }
+  if (req.user.role === "employee") {
+    const employee = await getEmployee(req.user._id);
+    if (String(record.changedBy) !== String(employee?._id)) {
+      res.status(403);
+      throw new Error("You can only delete your own oil-change records");
+    }
   }
   await record.deleteOne();
   res.json({ success: true, message: "Oil change record deleted" });
