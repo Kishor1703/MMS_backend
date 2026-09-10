@@ -222,12 +222,23 @@ const createMachine = asyncHandler(async (req, res) => {
       machineCount: 4,
     };
 
+  const fallbackCategory =
+    assetType === "Compressor"
+      ? "compressor"
+      : assetType === "Air Dryer"
+      ? "air_dryer"
+      : "loom";
+  const resolvedCategory =
+    machineCategory && ["loom", "compressor", "air_dryer", "other"].includes(machineCategory)
+      ? machineCategory
+      : fallbackCategory;
+
   const machine = await Machine.create({
     assetType,
     machineId,
     machineName,
     machineNumber,
-    machineCategory: machineCategory || "loom",
+    machineCategory: resolvedCategory,
     machineType,
     company,
     modelNumber,
@@ -288,7 +299,10 @@ const getMachines = asyncHandler(async (req, res) => {
   if (status) query.status = status;
   if (company) query.company = company;
   if (section) query.section = section;
-  if (category) query.machineCategory = category;
+  if (category) {
+    query.machineCategory =
+      category === "loom" ? { $in: ["loom", null] } : category;
+  }
 
   if (search) {
     query.$or = [

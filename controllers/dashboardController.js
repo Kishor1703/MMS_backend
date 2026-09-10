@@ -286,10 +286,10 @@ const getDashboardStats = asyncHandler(async (req, res) => {
     success: true,
     data: {
       totalOwners,
-      totalLooms: totalMachines,
+      totalLooms: typeCounts.loom,
       totalMachines,
-      totalCompressors,
-      totalAirDryers,
+      totalCompressors: typeCounts.compressor,
+      totalAirDryers: typeCounts.air_dryer,
       runningMachines,
       stoppedMachines,
       breakdownMachines,
