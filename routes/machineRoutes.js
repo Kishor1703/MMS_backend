@@ -31,7 +31,11 @@ router.put("/company-layout", authorize("admin"), saveCompanyLayout);
 router
   .route("/:id")
   .get(getMachineById)
+<<<<<<< HEAD
   .put(authorize("admin"), updateMachine)
+=======
+  .put(authorize("admin", "owner"), updateMachine)
+>>>>>>> ffaf46d9a88b7de760bc8cb49649a90ae1f59cb0
   .delete(authorize("admin"), deleteMachine);
 
 router.patch("/:id/layout", authorize("admin"), updateMachineLayout);

@@ -288,6 +288,8 @@ const getDashboardStats = asyncHandler(async (req, res) => {
       totalOwners,
       totalLooms: totalMachines,
       totalMachines,
+      totalCompressors,
+      totalAirDryers,
       runningMachines,
       stoppedMachines,
       breakdownMachines,

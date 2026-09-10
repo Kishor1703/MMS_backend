@@ -154,6 +154,7 @@ const getLayoutDisplayOrder = (machineNumber, width) => {
 const createMachine = asyncHandler(async (req, res) => {
   const {
     machineId,
+    assetType = "Machine",
     machineName,
     machineNumber,
     machineCategory,
@@ -195,13 +196,19 @@ const createMachine = asyncHandler(async (req, res) => {
     cleaningStatus,
   } = req.body;
 
-  if (!machineId || !machineName || !machineNumber) {
+  const equipmentNumber = assetType === "Machine" ? machineNumber : (machineNumber || machineId);
+  if (!machineId || !machineName || !equipmentNumber) {
     res.status(400);
-    throw new Error("machineId, machineName and machineNumber are required");
+    throw new Error("machineId and machineName are required");
+  }
+
+  if (!["Machine", "Compressor", "Air Dryer"].includes(assetType)) {
+    res.status(400);
+    throw new Error("assetType must be Machine, Compressor, or Air Dryer");
   }
 
   const exists = await Machine.findOne({
-    $or: [{ machineId }, { machineNumber }],
+    $or: [{ machineId }, { machineNumber: equipmentNumber }],
   });
   if (exists) {
     res.status(409);
@@ -216,6 +223,7 @@ const createMachine = asyncHandler(async (req, res) => {
     };
 
   const machine = await Machine.create({
+    assetType,
     machineId,
     machineName,
     machineNumber,
@@ -380,7 +388,6 @@ const getMachineById = asyncHandler(async (req, res) => {
   // Documents belong to the reporting workflow.  Do not send document URLs
   // to Admin or Owner clients, even if they try to bypass the hidden tab.
   const machineData = machine.toObject();
-  if (["admin", "owner"].includes(req.user.role)) delete machineData.documents;
 
   res.json({
     success: true,

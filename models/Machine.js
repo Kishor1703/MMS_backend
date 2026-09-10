@@ -2,6 +2,11 @@ const mongoose = require("mongoose");
 
 const machineSchema = new mongoose.Schema(
   {
+    assetType: {
+      type: String,
+      enum: ["Machine", "Compressor", "Air Dryer"],
+      default: "Machine",
+    },
     machineId: { type: String, required: true, unique: true, trim: true },
     machineName: { type: String, required: true, trim: true },
     machineNumber: { type: String, required: true, unique: true, trim: true },

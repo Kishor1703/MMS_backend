@@ -30,7 +30,16 @@ const maintenanceJobSchema = new mongoose.Schema(
 
     // An empty list means no spares were used.
     sparesUsed: { type: [spareUsedSchema], default: [] },
-
+    laborCost: { type: Number, default: 0 },
+    sparePartsCost: { type: Number, default: 0 },
+    otherCost: { type: Number, default: 0 },
+    totalCost: { type: Number, default: 0 },
+    nextMaintenanceDate: { type: Date },
+    jobStatus: {
+      type: String,
+      enum: ["Pending", "In Progress", "Resolved", "Escalated"],
+      default: "Resolved",
+    },
 
     performedBy: {
       type: mongoose.Schema.Types.ObjectId,
@@ -39,6 +48,14 @@ const maintenanceJobSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+maintenanceJobSchema.pre("validate", function (next) {
+  const labor = Number(this.laborCost) || 0;
+  const spareParts = Number(this.sparePartsCost) || 0;
+  const other = Number(this.otherCost) || 0;
+  this.totalCost = labor + spareParts + other;
+  next();
+});
 
 maintenanceJobSchema.index({ machine: 1, createdAt: -1 });
 
