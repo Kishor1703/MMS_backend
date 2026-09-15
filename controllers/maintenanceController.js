@@ -1,3 +1,4 @@
+const { validateMaintenanceStatus, saveMaintenanceStatus } = require("../utils/maintenanceStatus");
 const asyncHandler = require("express-async-handler");
 const Maintenance = require("../models/Maintenance");
 const Machine = require("../models/Machine");
@@ -54,17 +55,14 @@ const createMaintenance = asyncHandler(async (req, res) => {
     delete reportData.approvedBy;
     delete reportData.approvedAt;
   }
+  const reportedStatus = req.body.inspectionDetails?.machineStatus ?? (req.body.maintenanceType === "Idle" ? "Idle" : undefined);
+  validateMaintenanceStatus(reportedStatus, res);
   const record = await Maintenance.create(reportData);
+  await saveMaintenanceStatus(machine, reportedStatus);
   logActivity(req, "CREATE_MAINTENANCE", "Maintenance", record._id, {
     machine: machine._id,
     maintenanceType: record.maintenanceType,
   });
-  // An employee logging an Idle maintenance record is reporting the current
-  // machine state as well, so keep the machine card in sync.
-  if (req.user.role === "employee" && record.maintenanceType === "Idle") {
-    machine.status = "Idle";
-    await machine.save();
-  }
   res.status(201).json({ success: true, data: record });
 });
 

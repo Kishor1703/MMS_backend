@@ -517,12 +517,19 @@ const updateMachineStatus = asyncHandler(async (req, res) => {
     throw new Error("You can only update the status of an assigned machine");
   }
 
-  machine.status = status;
-  await machine.save();
+  const updated = await Machine.findOneAndUpdate(
+    { _id: machine._id, isDeleted: false, $or: [{ statusLocked: { $ne: true } }, { status: "Running" }] },
+    { $set: { status, statusLocked: status !== "Running" } },
+    { new: true, runValidators: true }
+  );
+  if (!updated) {
+    res.status(409);
+    throw new Error("Machine status is locked. Update it from the maintenance page.");
+  }
 
   await logActivity(req, "UPDATE_MACHINE_STATUS", "Machine", machine._id, { status });
 
-  res.json({ success: true, data: machine });
+  res.json({ success: true, data: updated });
 });
 
 // @desc    Soft-delete a machine

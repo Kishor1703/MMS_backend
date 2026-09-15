@@ -1,3 +1,4 @@
+const { validateMaintenanceStatus, saveMaintenanceStatus } = require("../utils/maintenanceStatus");
 const asyncHandler = require("express-async-handler");
 const CompressorMaintenance = require("../models/CompressorMaintenance");
 const Machine = require("../models/Machine");
@@ -77,6 +78,7 @@ const createCompressorMaintenance = asyncHandler(async (req, res) => {
     throw new Error("You can only maintain machines assigned to you");
   }
   validateRecord(req, res, req.body);
+  validateMaintenanceStatus(req.body.machineStatus, res);
 
   const performedBy = req.user.role === "employee"
     ? (await getEmployee(req.user._id))?._id
@@ -89,6 +91,8 @@ const createCompressorMaintenance = asyncHandler(async (req, res) => {
     createdBy: req.user._id,
   });
 
+  await saveMaintenanceStatus(machine, req.body.machineStatus);
+
   res.status(201).json({ success: true, data: record });
 });
 
@@ -100,6 +104,13 @@ const getCompressorMaintenanceRecords = asyncHandler(async (req, res) => {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const query = {};
   if (machine) query.machine = machine;
+  if (req.user.role === "employee") {
+    query.performedBy = (await getEmployee(req.user._id))?._id || null;
+  } else if (req.user.role === "general_manager") {
+    const employees = await Employee.find({ manager: req.user._id }).select("_id");
+    query.performedBy = { $in: employees.map((employee) => employee._id) };
+  }
+
 
   const skip = (Number(page) - 1) * safeLimit;
   const [records, total] = await Promise.all([

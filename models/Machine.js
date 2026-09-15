@@ -71,6 +71,7 @@ const machineSchema = new mongoose.Schema(
       enum: ["Running", "Stopped", "Under Maintenance", "Breakdown", "Idle"],
       default: "Running",
     },
+    statusLocked: { type: Boolean, default: false },
     assignedEmployees: [
       { type: mongoose.Schema.Types.ObjectId, ref: "Employee" },
     ],
