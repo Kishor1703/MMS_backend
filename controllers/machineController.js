@@ -372,7 +372,9 @@ const getMachineById = asyncHandler(async (req, res) => {
 
   const [maintenanceHistory, oilChangeHistory, spareHistory, maintenanceJobs, compressorMaintenance, airDryerMaintenance] =
     await Promise.all([
-      Maintenance.find({ machine: machine._id }).sort({ maintenanceDate: -1 }),
+      Maintenance.find({ machine: machine._id })
+        .populate("performedBy", "name employeeId")
+        .sort({ maintenanceDate: -1 }),
       OilChange.find({ machine: machine._id }).sort({ oilChangeDate: -1 }),
       SparePart.find({ machine: machine._id }).sort({ replacementDate: -1 }),
       MaintenanceJob.find({ machine: machine._id }),

@@ -64,6 +64,7 @@ app.use("/api/leaves", require("../routes/leaveRoutes"));
 app.use("/api/upload", require("../routes/uploadRoutes"));
 app.use("/api/compressor-maintenance", require("../routes/compressorMaintenanceRoutes"));
 app.use("/api/air-dryer-maintenance", require("../routes/airDryerMaintenanceRoutes"));
+app.use("/api/work-logs", require("../routes/workLogRoutes"));
 
 const healthResponse = (req, res) =>
   res.json({ success: true, message: "MMS API is running" });

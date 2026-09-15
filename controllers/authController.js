@@ -136,15 +136,23 @@ const deleteOwner = asyncHandler(async (req, res) => {
 // @route   POST /api/auth/login
 // @access  Public
 const login = asyncHandler(async (req, res) => {
-  const email = req.body.email?.trim().toLowerCase();
+  const identifier = req.body.identifier?.trim();
   const { password } = req.body;
 
-  const user = email && password
-    ? await User.findOne({ email }).select("+password")
-    : null;
+  let user = null;
+  if (identifier && password) {
+    const employee = await Employee.findOne({ employeeId: identifier }).select("user");
+    const identifiers = [
+      { email: identifier.toLowerCase() },
+      { phoneNumber: identifier },
+      ...(mongoose.isValidObjectId(identifier) ? [{ _id: identifier }] : []),
+      ...(employee?.user ? [{ _id: employee.user }] : []),
+    ];
+    user = await User.findOne({ $or: identifiers }).select("+password");
+  }
   if (!user || !(await user.comparePassword(password))) {
     res.status(401);
-    throw new Error("Invalid email or password");
+    throw new Error("Invalid email or phone number, or password");
   }
   if (!user.isActive) {
     res.status(403);

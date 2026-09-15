@@ -8,6 +8,7 @@ const {
   updateOilChange,
   deleteOilChange,
   getDueOilChanges,
+  getOilChangeDueStatus,
   markReminderSent,
 } = require("../controllers/oilChangeController");
 
@@ -17,6 +18,8 @@ router.patch("/:id/mark-reminder-sent", requireSchedulerKey, markReminderSent);
 
 // Normal user-facing endpoints
 router.use(protect);
+
+router.get("/due-status", getOilChangeDueStatus);
 
 router.route("/").get(getOilChanges).post(createOilChange);
 
