@@ -101,6 +101,11 @@ const getAirDryerMaintenanceRecords = asyncHandler(async (req, res) => {
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const query = {};
   if (machine) query.machine = machine;
+  if (req.query.company) {
+    const ids = await Machine.find({ company: req.query.company }).distinct("_id");
+    query.machine = { $in: machine ? ids.filter((id) => String(id) === machine) : ids };
+  }
+
   if (req.user.role === "employee") {
     query.performedBy = (await getEmployee(req.user._id))?._id || null;
   } else if (req.user.role === "general_manager") {

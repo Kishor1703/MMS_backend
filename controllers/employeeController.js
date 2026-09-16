@@ -99,6 +99,11 @@ const getEmployees = asyncHandler(async (req, res) => {
   const { search, department, page = 1, limit = 20 } = req.query;
   const safeLimit = Math.min(Math.max(Number(limit) || 20, 1), 500);
   const query = { isActive: true, ...employeeScope(req) };
+  if (req.query.company) {
+    const ids = await Machine.find({ company: req.query.company }).distinct("_id");
+    query.assignedMachines = { $in: ids };
+  }
+
 
   if (department) query.department = department;
   if (search) {

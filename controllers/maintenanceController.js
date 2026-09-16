@@ -96,6 +96,11 @@ const getMaintenanceRecords = asyncHandler(async (req, res) => {
     else if (due === "upcoming") query.nextMaintenanceDate = { $gt: weekEnd, $ne: null };
   }
 
+  if (req.query.company) {
+    const companyMachines = await Machine.find({ company: req.query.company }).distinct("_id");
+    query.$and = [{ machine: { $in: companyMachines } }];
+  }
+
   if (req.user.role === "employee") {
     const employee = await getEmployee(req.user._id);
     query.performedBy = employee?._id || null;
