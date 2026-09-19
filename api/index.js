@@ -8,6 +8,10 @@ const cookieParser = require("cookie-parser");
 
 const connectDB = require("../config/db");
 const { notFound, errorHandler } = require("../middleware/errorHandler");
+const { requireSchedulerKey } = require("../middleware/auth");
+const { runDailyChecks } = require("../utils/scheduler");
+const { startScheduler } = require("../utils/scheduler");
+const { startBackup } = require("../utils/backup");
 
 connectDB();
 
@@ -66,6 +70,16 @@ app.use("/api/compressor-maintenance", require("../routes/compressorMaintenanceR
 app.use("/api/air-dryer-maintenance", require("../routes/airDryerMaintenanceRoutes"));
 app.use("/api/work-logs", require("../routes/workLogRoutes"));
 
+// One-shot scheduler test endpoint — POST /api/scheduler/run
+app.post("/api/scheduler/run", requireSchedulerKey, async (req, res, next) => {
+  try {
+    const result = await runDailyChecks();
+    res.json({ success: true, message: "Scheduler run completed", ...result });
+  } catch (err) {
+    next(err);
+  }
+});
+
 const healthResponse = (req, res) =>
   res.json({ success: true, message: "MMS API is running" });
 
@@ -80,6 +94,9 @@ app.use(errorHandler);
 if (require.main === module) {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+  // In-process daily reminders + backups (local only, never on Vercel).
+  startScheduler();
+  startBackup();
 }
 
 module.exports = app;

@@ -187,8 +187,13 @@ const getMe = asyncHandler(async (req, res) => {
 
 // @desc    Change password (while logged in)
 // @route   PUT /api/auth/change-password
-// @access  Private
+// @access  Private (managers only — employees get their password reset by a manager)
 const changePassword = asyncHandler(async (req, res) => {
+  if (req.user.role === "employee") {
+    res.status(403);
+    throw new Error("Employees cannot change their password. Please ask your manager.");
+  }
+
   const { currentPassword, newPassword } = req.body;
   const user = await User.findById(req.user._id).select("+password");
 
